@@ -70,6 +70,7 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use PhpOffice\PhpSpreadsheet\Style\Color;
+use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 
 // ==================== EXCEL COMPLETO CON PHPSPREADSHEET (VERSIÓN COMPLETA) ====================
 
@@ -116,7 +117,7 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
         $sheet1->getStyle($cell)
             ->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
         $sheet1->getStyle($cell)
-            ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF4472C4');
+            ->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF009A3F');
         $sheet1->getStyle($cell)
             ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setVertical(Alignment::VERTICAL_CENTER);
@@ -156,10 +157,10 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
         
         // Color de fondo según proceso
         $color = match($p['proceso']) {
-            'Recepción' => 'FFE8F6F3',
-            'Almacenaje' => 'FFFEF9E7',
-            'Despacho' => 'FFF4ECF7',
-            'Otros' => 'FFFDEAEC',
+            'Recepción' => 'FFFFFFFF',
+            'Almacenaje' => 'FFFFFFFF',
+            'Despacho' => 'FFFFFFFF',
+            'Otros' => 'FFFFFFFF',
             default => 'FFFFFFFF'
         };
         
@@ -188,27 +189,63 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
         $sheet1->getRowDimension($rowNum)->setRowHeight(-1);
     }
     
-    // ========== HOJA 2: DETALLES PÁGINA 1 ==========
+    // ========== HOJA 2: DETALLES COMPLETOS (P1 + P2) ==========
     $sheet2 = $spreadsheet->createSheet();
     $sheet2->setTitle('Detalles P1');
     $sheet2->getPageSetup()
         ->setOrientation(PageSetup::ORIENTATION_PORTRAIT)
         ->setPaperSize(PageSetup::PAPERSIZE_A4);
     
-    // Configurar columnas
+    // Configurar columnas como en Detalles P2 (más ordenadas)
     $sheet2->getColumnDimension('A')->setWidth(8);
-    $sheet2->getColumnDimension('B')->setWidth(90);
-    $sheet2->getColumnDimension('C')->setWidth(30);
+    $sheet2->getColumnDimension('B')->setWidth(75); // Reducido para dejar espacio para el logo
+    $sheet2->getColumnDimension('C')->setWidth(25);
     
-    // Título
-    $sheet2->mergeCells('A1:C1');
+    // Ajustar altura de la fila 1 para el logo
+    $sheet2->getRowDimension(1)->setRowHeight(50); // Altura suficiente para el logo
+    
+    // Título con logo
+    $sheet2->mergeCells('A1:B1'); // Ahora solo fusionamos A y B
     $sheet2->setCellValue('A1', 'SERVICIO DE ALMACENAJE Y MANIPULACIÓN');
-    $sheet2->getStyle('A1')->getFont()->setBold(true)->setSize(16);
-    $sheet2->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+    $sheet2->getStyle('A1')->getFont()->setBold(true)->setSize(16)->setColor(new Color('FFFFFFFF'));
+    $sheet2->getStyle('A1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF8DE06B');
+    $sheet2->getStyle('A1')->getAlignment()
+        ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+        ->setVertical(Alignment::VERTICAL_CENTER);
+    
+    // Buscar e insertar logo local
+    $logoLocal = 'ransa.png'; // Nombre del archivo local
+    
+    // Verificar si existe la imagen local
+    if (file_exists($logoLocal)) {
+        $drawing = new Drawing();
+        $drawing->setName('Logo Ransa');
+        $drawing->setDescription('Logo Ransa');
+        $drawing->setPath($logoLocal);
+        $drawing->setHeight(39); // Altura del logo
+        $drawing->setCoordinates('C1');
+        $drawing->setWorksheet($sheet2);
+        
+        // Centrar el logo en la celda
+        $sheet2->getStyle('C1')->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER);
+    } else {
+        // Si no existe el logo local, poner texto alternativo
+        $sheet2->setCellValue('C1', 'LOGO RANSA');
+        $sheet2->getStyle('C1')->getFont()->setBold(true)->setSize(12);
+        $sheet2->getStyle('C1')->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet2->getStyle('C1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFE8F4F8');
+    }
+    
+    // Ajustar altura de la celda C1 para que coincida con el título
+    $sheet2->getStyle('C1')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     
     $sheet2->setCellValue('A2', 'Fecha:');
     $sheet2->setCellValue('B2', date('d/m/Y'));
-    $sheet2->setCellValue('A3', 'Cliente:');
+    $sheet2->setCellValue('A3', 'Almacen:');
     $sheet2->setCellValue('B3', $cliente_info);
     
     $row = 5;
@@ -217,7 +254,7 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     $sheet2->mergeCells('A' . $row . ':C' . $row);
     $sheet2->setCellValue('A' . $row, 'ALCANCE DEL SERVICIO - DESCRIPCIÓN');
     $sheet2->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
-    $sheet2->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF4472C4');
+    $sheet2->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF009A3F');
     $sheet2->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
     $sheet2->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     $row++;
@@ -230,7 +267,7 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     $sheet2->mergeCells('A' . $row . ':C' . $row);
     $sheet2->setCellValue('A' . $row, '1. CONTEXTO DEL SERVICIO');
     $sheet2->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
-    $sheet2->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF5B9BD5');
+    $sheet2->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF009A3F');
     $sheet2->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     $row++;
     
@@ -270,7 +307,7 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     $sheet2->mergeCells('A' . $row . ':C' . $row);
     $sheet2->setCellValue('A' . $row, '2. DATOS DEL PROCESO RECEPCIÓN');
     $sheet2->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
-    $sheet2->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF5B9BD5');
+    $sheet2->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF009A3F');
     $sheet2->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     $row++;
     
@@ -310,31 +347,14 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
         $row++;
     }
     
-    // Ajustar altura de filas para texto largo
-    foreach (range(5, $row) as $rowNum) {
-        $sheet2->getRowDimension($rowNum)->setRowHeight(-1);
-    }
+    $row++;
     
-    // ========== HOJA 3: DETALLES PÁGINA 2 ==========
-    $sheet3 = $spreadsheet->createSheet();
-    $sheet3->setTitle('Detalles P2');
-    $sheet3->getPageSetup()
-        ->setOrientation(PageSetup::ORIENTATION_PORTRAIT)
-        ->setPaperSize(PageSetup::PAPERSIZE_A4);
-    
-    $sheet3->getColumnDimension('A')->setWidth(8);
-    $sheet3->getColumnDimension('B')->setWidth(100);
-    
-    $row = 1;
-
-
-
-       // . DATOS DEL PROCESO ALMACENAJE
-    $sheet3->mergeCells('A' . $row . ':B' . $row);
-    $sheet3->setCellValue('A' . $row, '3. DATOS DEL PROCESO ALMACENAJE');
-    $sheet3->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
-    $sheet3->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF5B9BD5');
-    $sheet3->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+    // 3. DATOS DEL PROCESO ALMACENAJE (CONTENIDO DE DETALLES P2)
+    $sheet2->mergeCells('A' . $row . ':C' . $row);
+    $sheet2->setCellValue('A' . $row, '3. DATOS DEL PROCESO ALMACENAJE');
+    $sheet2->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
+    $sheet2->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF009A3F');
+    $sheet2->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     $row++;
     
     $almacenaje_items = [
@@ -353,11 +373,13 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     ];
     
     foreach ($almacenaje_items as $item => $desc) {
-        $sheet3->setCellValue('A' . $row, $item);
-        $sheet3->setCellValue('B' . $row, $desc);
+        $sheet2->setCellValue('A' . $row, $item);
+        $sheet2->mergeCells('B' . $row . ':C' . $row);
+        $sheet2->setCellValue('B' . $row, $desc);
         
-        foreach (['A', 'B'] as $col) {
-            $sheet3->getStyle($col . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        // Aplicar bordes
+        foreach (['A', 'B', 'C'] as $col) {
+            $sheet2->getStyle($col . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
         }
         
         $row++;
@@ -365,48 +387,12 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     
     $row++;
     
-    // 3. DATOS DEL PROCESO ALMACENAJE
-    $sheet3->mergeCells('A' . $row . ':B' . $row);
-    $sheet3->setCellValue('A' . $row, '3. DATOS DEL PROCESO ALMACENAJE');
-    $sheet3->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
-    $sheet3->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF5B9BD5');
-    $sheet3->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-    $row++;
-    
-    $almacenaje_items = [
-        '3.1.' => 'Las tarifas de almacenaje aplican para los negocios de: Retail, Consumo masivo y otros servicios bajo el estándar SENASAG.',
-        '3.2.' => 'Los Servicios Bajo Estándar AGEMED, Temperatura controlada, Refrigerados, Congelados, Petróleo y Gas, Productos químicos, Sustancias controladas no aplican a la propuesta Estándar de servicios Logísticos RANSA.',
-        '3.3.' => 'Las tarifas de almacenaje son tarifas mensualizadas, donde el máximo del mes en ocupación se usa para el cobro en la prefectura.',
-        '3.4.' => 'Cada Pallet de almacenaje podrá soportar hasta 4 Sku´s o 4 ítems diferentes por cada Posición. (No excluyente la utilización del espacio).',
-        '3.5.' => 'La tarifa No incluye posición estantería para unitarios.',
-        '3.6.' => 'La tarifa SI incluye SEGUROS de TODO RIESGOS y RESPONSABILIDAD CIVIL.',
-        '3.7.' => 'Ransa incluye un Sistema WMS para el control de las Operaciones.',
-        '3.8.' => 'Ransa por estándar almacena productos en pallet Mercosur (1mx1,2mx1,55m) y con un Peso igual o menor a 1tn o 1.000kg.',
-        '3.9.' => 'El servicio de almacenaje incluye control de plaga.',
-        '3.10.' => 'Las tarifa de almacenaje incluye los procesos de Slotting para mejorar la productividad de los despachos (Picking).',
-        '3.11.' => 'Ransa realiza un control de contaminación cruzada para evitar contaminación de los diferentes productos almacenados en Bodega.',
-        '3.12.' => 'Por su standar de Calidad, Ransa exigirá a sus clientes que todo pallet que llegue a su centro de distribución cumpla los siguientes criterios: Pallet con tratamiento termico según Norma la NIMF 15 y su respectiva fumigación.'
-    ];
-    
-    foreach ($almacenaje_items as $item => $desc) {
-        $sheet3->setCellValue('A' . $row, $item);
-        $sheet3->setCellValue('B' . $row, $desc);
-        
-        foreach (['A', 'B'] as $col) {
-            $sheet3->getStyle($col . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-        }
-        
-        $row++;
-    }
-    
-    $row++;
-    
-    // 4. DATOS DEL PROCESO DESPACHO
-    $sheet3->mergeCells('A' . $row . ':B' . $row);
-    $sheet3->setCellValue('A' . $row, '4. DATOS DEL PROCESO DESPACHO');
-    $sheet3->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
-    $sheet3->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF5B9BD5');
-    $sheet3->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+    // 4. DATOS DEL PROCESO DESPACHO (CONTENIDO DE DETALLES P2)
+    $sheet2->mergeCells('A' . $row . ':C' . $row);
+    $sheet2->setCellValue('A' . $row, '4. DATOS DEL PROCESO DESPACHO');
+    $sheet2->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
+    $sheet2->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF009A3F');
+    $sheet2->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     $row++;
     
     $despacho_items = [
@@ -419,11 +405,13 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     ];
     
     foreach ($despacho_items as $item => $desc) {
-        $sheet3->setCellValue('A' . $row, $item);
-        $sheet3->setCellValue('B' . $row, $desc);
+        $sheet2->setCellValue('A' . $row, $item);
+        $sheet2->mergeCells('B' . $row . ':C' . $row);
+        $sheet2->setCellValue('B' . $row, $desc);
         
-        foreach (['A', 'B'] as $col) {
-            $sheet3->getStyle($col . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        // Aplicar bordes
+        foreach (['A', 'B', 'C'] as $col) {
+            $sheet2->getStyle($col . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
         }
         
         $row++;
@@ -431,12 +419,12 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     
     $row++;
     
-    // 5. DATOS DEL PROCESO INVENTARIO DE CONTROL
-    $sheet3->mergeCells('A' . $row . ':B' . $row);
-    $sheet3->setCellValue('A' . $row, '5. DATOS DEL PROCESO INVENTARIO DE CONTROL');
-    $sheet3->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
-    $sheet3->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF5B9BD5');
-    $sheet3->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+    // 5. DATOS DEL PROCESO INVENTARIO DE CONTROL (CONTENIDO DE DETALLES P2)
+    $sheet2->mergeCells('A' . $row . ':C' . $row);
+    $sheet2->setCellValue('A' . $row, '5. DATOS DEL PROCESO INVENTARIO DE CONTROL');
+    $sheet2->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
+    $sheet2->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF009A3F');
+    $sheet2->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     $row++;
     
     $inventario_items = [
@@ -448,11 +436,13 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     ];
     
     foreach ($inventario_items as $item => $desc) {
-        $sheet3->setCellValue('A' . $row, $item);
-        $sheet3->setCellValue('B' . $row, $desc);
+        $sheet2->setCellValue('A' . $row, $item);
+        $sheet2->mergeCells('B' . $row . ':C' . $row);
+        $sheet2->setCellValue('B' . $row, $desc);
         
-        foreach (['A', 'B'] as $col) {
-            $sheet3->getStyle($col . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        // Aplicar bordes
+        foreach (['A', 'B', 'C'] as $col) {
+            $sheet2->getStyle($col . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
         }
         
         $row++;
@@ -460,12 +450,12 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     
     $row++;
     
-    // 6. DATOS DEL PROCESO REPORTES
-    $sheet3->mergeCells('A' . $row . ':B' . $row);
-    $sheet3->setCellValue('A' . $row, '6. DATOS DEL PROCESO REPORTES');
-    $sheet3->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
-    $sheet3->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF5B9BD5');
-    $sheet3->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+    // 6. DATOS DEL PROCESO REPORTES (CONTENIDO DE DETALLES P2)
+    $sheet2->mergeCells('A' . $row . ':C' . $row);
+    $sheet2->setCellValue('A' . $row, '6. DATOS DEL PROCESO REPORTES');
+    $sheet2->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
+    $sheet2->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF009A3F');
+    $sheet2->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     $row++;
     
     $reportes_items = [
@@ -476,11 +466,13 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     ];
     
     foreach ($reportes_items as $item => $desc) {
-        $sheet3->setCellValue('A' . $row, $item);
-        $sheet3->setCellValue('B' . $row, $desc);
+        $sheet2->setCellValue('A' . $row, $item);
+        $sheet2->mergeCells('B' . $row . ':C' . $row);
+        $sheet2->setCellValue('B' . $row, $desc);
         
-        foreach (['A', 'B'] as $col) {
-            $sheet3->getStyle($col . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        // Aplicar bordes
+        foreach (['A', 'B', 'C'] as $col) {
+            $sheet2->getStyle($col . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
         }
         
         $row++;
@@ -488,15 +480,17 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     
     // Resumen final
     $row += 2;
-    $sheet3->mergeCells('A' . $row . ':B' . $row);
-    $sheet3->setCellValue('A' . $row, '📋 Resumen: Este documento contiene las 46 especificaciones completas del servicio de almacenaje, organizadas en 6 categorías principales.');
-    $sheet3->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFF8F9FA');
-    $sheet3->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+    $sheet2->mergeCells('A' . $row . ':C' . $row);
+    $sheet2->setCellValue('A' . $row, '📋 Resumen: Este documento contiene las 46 especificaciones completas del servicio de almacenaje, organizadas en 6 categorías principales.');
+    $sheet2->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF009A3F');
+    $sheet2->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     
-    // Ajustar altura de filas
-    foreach (range(1, $row) as $rowNum) {
-        $sheet3->getRowDimension($rowNum)->setRowHeight(-1);
-        $sheet3->getStyle('B' . $rowNum)->getAlignment()->setWrapText(true);
+    // Ajustar altura de filas para texto largo
+    foreach (range(5, $row) as $rowNum) {
+        $sheet2->getRowDimension($rowNum)->setRowHeight(-1);
+        // Habilitar wrap text para todas las celdas de la columna B y C
+        $sheet2->getStyle('B' . $rowNum)->getAlignment()->setWrapText(true);
+        $sheet2->getStyle('C' . $rowNum)->getAlignment()->setWrapText(true);
     }
     
     // ========== ENVIAR AL NAVEGADOR ==========
@@ -511,8 +505,6 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     $writer->save('php://output');
     exit;
 }
-
-
 
 // ==================== VISTA IMPRESIÓN COMPLETA (3 PÁGINAS) ====================
 function generarVistaImpresionCompleta($registro, $procesos, $cliente_info) {
