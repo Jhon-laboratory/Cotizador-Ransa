@@ -1,5 +1,5 @@
 <?php
-// obtener_detalles.php - VERSIÓN SIMPLIFICADA
+// obtener_detalles.php - VERSIÓN SIMPLIFICADA CON SQLSRV
 session_start();
 require_once 'conexion.php';
 
@@ -10,10 +10,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['
     
     if ($id > 0) {
         try {
-            // Buscar por ID
-            $stmt = $pdo->prepare("SELECT * FROM externos.CotizadorTarifas WHERE id = ?");
-            $stmt->execute([$id]);
-            $registro = $stmt->fetch(PDO::FETCH_ASSOC);
+            // Buscar por ID con SQLSRV
+            $sql = "SELECT * FROM externos.CotizadorTarifas WHERE id = ?";
+            $stmt = sqlsrv_prepare($conn, $sql, array(&$id));
+            
+            if ($stmt === false) {
+                $response['message'] = 'Error al preparar consulta: ' . print_r(sqlsrv_errors(), true);
+                echo json_encode($response, JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            
+            if (!sqlsrv_execute($stmt)) {
+                $response['message'] = 'Error al ejecutar consulta: ' . print_r(sqlsrv_errors(), true);
+                echo json_encode($response, JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            
+            $registro = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
             
             if ($registro) {
                 // Generar HTML formateado para la tabla
@@ -29,7 +42,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['
                 $response['message'] = 'No se encontró el registro con ID: ' . $id;
             }
             
-        } catch(PDOException $e) {
+            // Liberar recursos
+            sqlsrv_free_stmt($stmt);
+            
+        } catch(Exception $e) {
             $response['message'] = 'Error en la base de datos: ' . $e->getMessage();
         }
     } else {

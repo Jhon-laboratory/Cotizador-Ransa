@@ -1,5 +1,5 @@
 <?php
-// generar_reporte.php - VERSIÓN COMPATIBLE CON PHP 7.4 CON SQLSRV
+// generar_reporte.php - VERSIÓN COMPLETA CON TODOS LOS ITEMS
 session_start();
 require_once 'conexion.php';
 require_once 'vendor/autoload.php';
@@ -11,19 +11,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     
     if ($id > 0) {
         try {
-            // Buscar registro por ID con SQLSRV
-            $sql = "SELECT * FROM externos.CotizadorTarifas WHERE id = ?";
-            $stmt = sqlsrv_prepare($conn, $sql, array(&$id));
-            
-            if ($stmt === false) {
-                die('Error al preparar consulta: ' . print_r(sqlsrv_errors(), true));
-            }
-            
-            if (!sqlsrv_execute($stmt)) {
-                die('Error al ejecutar consulta: ' . print_r(sqlsrv_errors(), true));
-            }
-            
-            $registro = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+            // Buscar registro por ID
+            $stmt = $pdo->prepare("SELECT * FROM externos.CotizadorTarifas WHERE id = ?");
+            $stmt->execute([$id]);
+            $registro = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($registro) {
                 // Procesos mapeados
@@ -57,14 +48,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
                         generarVistaImpresionCompleta($registro, $procesos, $cliente_info);
                 }
                 
-                // Liberar recursos
-                sqlsrv_free_stmt($stmt);
-                
             } else {
                 die('No se encontró el registro');
             }
             
-        } catch(Exception $e) {
+        } catch(PDOException $e) {
             die('Error en la base de datos: ' . $e->getMessage());
         }
     } else {
@@ -83,6 +71,8 @@ use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use PhpOffice\PhpSpreadsheet\Style\Color;
 use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
+
+// ==================== EXCEL COMPLETO CON PHPSPREADSHEET (VERSIÓN COMPLETA) ====================
 
 function generarExcelCompleto($registro, $procesos, $cliente_info) {
     // Crear nuevo Spreadsheet
@@ -165,26 +155,14 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
         $sheet1->getStyle('F' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet1->getStyle('G' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         
-        // Color de fondo según proceso - VERSIÓN PHP 7.4 (sin match())
-        $color = 'FFFFFFFF'; // Por defecto
-        
-        switch($p['proceso']) {
-            case 'Recepción':
-                $color = 'FFFFFFFF';
-                break;
-            case 'Almacenaje':
-                $color = 'FFFFFFFF';
-                break;
-            case 'Despacho':
-                $color = 'FFFFFFFF';
-                break;
-            case 'Otros':
-                $color = 'FFFFFFFF';
-                break;
-            default:
-                $color = 'FFFFFFFF';
-                break;
-        }
+        // Color de fondo según proceso
+        $color = match($p['proceso']) {
+            'Recepción' => 'FFFFFFFF',
+            'Almacenaje' => 'FFFFFFFF',
+            'Despacho' => 'FFFFFFFF',
+            'Otros' => 'FFFFFFFF',
+            default => 'FFFFFFFF'
+        };
         
         foreach (range('A', 'G') as $col) {
             $sheet1->getStyle($col . $row)
@@ -218,16 +196,16 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
         ->setOrientation(PageSetup::ORIENTATION_PORTRAIT)
         ->setPaperSize(PageSetup::PAPERSIZE_A4);
     
-    // Configurar columnas
+    // Configurar columnas como en Detalles P2 (más ordenadas)
     $sheet2->getColumnDimension('A')->setWidth(8);
-    $sheet2->getColumnDimension('B')->setWidth(75);
+    $sheet2->getColumnDimension('B')->setWidth(75); // Reducido para dejar espacio para el logo
     $sheet2->getColumnDimension('C')->setWidth(25);
     
     // Ajustar altura de la fila 1 para el logo
-    $sheet2->getRowDimension(1)->setRowHeight(50);
+    $sheet2->getRowDimension(1)->setRowHeight(50); // Altura suficiente para el logo
     
     // Título con logo
-    $sheet2->mergeCells('A1:B1');
+    $sheet2->mergeCells('A1:B1'); // Ahora solo fusionamos A y B
     $sheet2->setCellValue('A1', 'SERVICIO DE ALMACENAJE Y MANIPULACIÓN');
     $sheet2->getStyle('A1')->getFont()->setBold(true)->setSize(16)->setColor(new Color('FFFFFFFF'));
     $sheet2->getStyle('A1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF8DE06B');
@@ -236,7 +214,7 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
         ->setVertical(Alignment::VERTICAL_CENTER);
     
     // Buscar e insertar logo local
-    $logoLocal = 'ransa.png';
+    $logoLocal = 'ransa.png'; // Nombre del archivo local
     
     // Verificar si existe la imagen local
     if (file_exists($logoLocal)) {
@@ -244,7 +222,7 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
         $drawing->setName('Logo Ransa');
         $drawing->setDescription('Logo Ransa');
         $drawing->setPath($logoLocal);
-        $drawing->setHeight(39);
+        $drawing->setHeight(39); // Altura del logo
         $drawing->setCoordinates('C1');
         $drawing->setWorksheet($sheet2);
         
@@ -262,7 +240,7 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
         $sheet2->getStyle('C1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFE8F4F8');
     }
     
-    // Ajustar altura de la celda C1
+    // Ajustar altura de la celda C1 para que coincida con el título
     $sheet2->getStyle('C1')->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     
     $sheet2->setCellValue('A2', 'Fecha:');
@@ -371,7 +349,7 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     
     $row++;
     
-    // 3. DATOS DEL PROCESO ALMACENAJE
+    // 3. DATOS DEL PROCESO ALMACENAJE (CONTENIDO DE DETALLES P2)
     $sheet2->mergeCells('A' . $row . ':C' . $row);
     $sheet2->setCellValue('A' . $row, '3. DATOS DEL PROCESO ALMACENAJE');
     $sheet2->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
@@ -409,7 +387,7 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     
     $row++;
     
-    // 4. DATOS DEL PROCESO DESPACHO
+    // 4. DATOS DEL PROCESO DESPACHO (CONTENIDO DE DETALLES P2)
     $sheet2->mergeCells('A' . $row . ':C' . $row);
     $sheet2->setCellValue('A' . $row, '4. DATOS DEL PROCESO DESPACHO');
     $sheet2->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
@@ -441,7 +419,7 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     
     $row++;
     
-    // 5. DATOS DEL PROCESO INVENTARIO DE CONTROL
+    // 5. DATOS DEL PROCESO INVENTARIO DE CONTROL (CONTENIDO DE DETALLES P2)
     $sheet2->mergeCells('A' . $row . ':C' . $row);
     $sheet2->setCellValue('A' . $row, '5. DATOS DEL PROCESO INVENTARIO DE CONTROL');
     $sheet2->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
@@ -472,7 +450,7 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     
     $row++;
     
-    // 6. DATOS DEL PROCESO REPORTES
+    // 6. DATOS DEL PROCESO REPORTES (CONTENIDO DE DETALLES P2)
     $sheet2->mergeCells('A' . $row . ':C' . $row);
     $sheet2->setCellValue('A' . $row, '6. DATOS DEL PROCESO REPORTES');
     $sheet2->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
@@ -510,6 +488,7 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     // Ajustar altura de filas para texto largo
     foreach (range(5, $row) as $rowNum) {
         $sheet2->getRowDimension($rowNum)->setRowHeight(-1);
+        // Habilitar wrap text para todas las celdas de la columna B y C
         $sheet2->getStyle('B' . $rowNum)->getAlignment()->setWrapText(true);
         $sheet2->getStyle('C' . $rowNum)->getAlignment()->setWrapText(true);
     }
@@ -552,19 +531,19 @@ function generarVistaImpresionCompleta($registro, $procesos, $cliente_info) {
             .no-print { display: none !important; }
             body { 
                 font-family: 'Calibri', Arial, sans-serif;
-                font-size: 8.5pt;
+                font-size: 8.5pt; /* Reducido ligeramente para mejor ajuste */
                 line-height: 1.15;
                 color: #000;
             }
             .contenedor-pagina {
-                min-height: 25.7cm;
+                min-height: 25.7cm; /* Altura aproximada A4 menos márgenes */
                 position: relative;
                 width: 100%;
                 overflow: hidden;
             }
         }
         
-        /* ESTILOS GENERALES */
+        /* ESTILOS GENERALES - MANTENIDOS */
         body {
             font-family: 'Calibri', Arial, sans-serif;
             font-size: 10pt;
@@ -577,7 +556,7 @@ function generarVistaImpresionCompleta($registro, $procesos, $cliente_info) {
         
         .contenedor-pagina {
             background: white;
-            padding: 15px;
+            padding: 15px; /* Reducido para mejor ajuste */
             margin-bottom: 20px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
             border-radius: 5px;
@@ -585,7 +564,7 @@ function generarVistaImpresionCompleta($registro, $procesos, $cliente_info) {
             box-sizing: border-box;
         }
         
-        /* BOTONES */
+        /* BOTONES - MANTENIDOS */
         .botones-contenedor {
             text-align: center;
             margin: 20px 0;
@@ -636,20 +615,20 @@ function generarVistaImpresionCompleta($registro, $procesos, $cliente_info) {
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
         
-        /* TABLA PRINCIPAL */
+        /* TABLA PRINCIPAL - AJUSTADA PARA A4 VERTICAL */
         .tabla-principal {
             width: 100%;
             border-collapse: collapse;
             margin: 10px 0;
-            font-size: 8pt;
-            table-layout: fixed;
+            font-size: 8pt; /* Reducido para mejor ajuste */
+            table-layout: fixed; /* Para controlar mejor el ancho */
         }
         
         .tabla-principal th {
             background: linear-gradient(135deg, #2c3e50, #34495e);
             color: white;
             font-weight: bold;
-            padding: 6px 4px;
+            padding: 6px 4px; /* Reducido */
             text-align: center;
             border: 1px solid #1a252f;
             vertical-align: middle;
@@ -657,59 +636,59 @@ function generarVistaImpresionCompleta($registro, $procesos, $cliente_info) {
         }
         
         .tabla-principal td {
-            padding: 5px 4px;
+            padding: 5px 4px; /* Reducido */
             border: 1px solid #ddd;
             vertical-align: top;
             font-size: 8pt;
-            word-wrap: break-word;
+            word-wrap: break-word; /* Para que el texto se ajuste */
         }
         
-        /* ANCHOS DE COLUMNAS */
+        /* NUEVOS ANCHOS DE COLUMNAS PARA A4 VERTICAL */
         .tabla-principal th:nth-child(1),
         .tabla-principal td:nth-child(1) {
-            width: 5% !important;
+            width: 5% !important; /* Nro */
         }
         
         .tabla-principal th:nth-child(2),
         .tabla-principal td:nth-child(2) {
-            width: 10% !important;
+            width: 10% !important; /* Proceso */
         }
         
         .tabla-principal th:nth-child(3),
         .tabla-principal td:nth-child(3) {
-            width: 18% !important;
+            width: 18% !important; /* Descripción */
         }
         
         .tabla-principal th:nth-child(4),
         .tabla-principal td:nth-child(4) {
-            width: 30% !important;
+            width: 30% !important; /* Alcance */
         }
         
         .tabla-principal th:nth-child(5),
         .tabla-principal td:nth-child(5) {
-            width: 8% !important;
+            width: 8% !important; /* UDM */
         }
         
         .tabla-principal th:nth-child(6),
         .tabla-principal td:nth-child(6) {
-            width: 10% !important;
+            width: 10% !important; /* Frecuencia */
         }
         
         .tabla-principal th:nth-child(7),
         .tabla-principal td:nth-child(7) {
-            width: 12% !important;
+            width: 12% !important; /* P.U USD */
         }
         
-        /* COLORES POR PROCESO */
+        /* COLORES POR PROCESO - MANTENIDOS */
         .recepcion { background-color: #e8f6f3 !important; }
         .almacenaje { background-color: #fef9e7 !important; }
         .despacho { background-color: #f4ecf7 !important; }
         .otros { background-color: #fdedec !important; }
         
-        /* ENCABEZADO */
+        /* ENCABEZADO - AJUSTADO */
         .encabezado-titulo {
             text-align: center;
-            font-size: 12pt;
+            font-size: 12pt; /* Reducido para mejor ajuste */
             font-weight: bold;
             color: #2c3e50;
             margin-bottom: 5px;
@@ -717,12 +696,12 @@ function generarVistaImpresionCompleta($registro, $procesos, $cliente_info) {
             border-bottom: 2px solid #3498db;
         }
         
-        /* TABLA DETALLES */
+        /* TABLA DETALLES - AJUSTADA */
         .tabla-detalles {
             width: 100%;
             border-collapse: collapse;
             margin: 8px 0;
-            font-size: 7.5pt;
+            font-size: 7.5pt; /* Reducido */
             table-layout: fixed;
         }
         
@@ -750,23 +729,23 @@ function generarVistaImpresionCompleta($registro, $procesos, $cliente_info) {
             padding: 6px;
             margin: 12px 0 4px 0;
             border-radius: 3px;
-            font-size: 9pt;
+            font-size: 9pt; /* Reducido */
         }
         
         .numero-item {
-            width: 35px !important;
+            width: 35px !important; /* Reducido */
             text-align: center;
             font-weight: bold;
             background: #f1f8ff;
             border-right: 2px solid #5B9BD5;
         }
         
-        /* FOOTER */
+        /* FOOTER - AJUSTADO */
         .footer {
             margin-top: 20px;
             padding-top: 8px;
             border-top: 1px solid #ddd;
-            font-size: 7pt;
+            font-size: 7pt; /* Reducido */
             color: #7f8c8d;
             text-align: center;
             position: absolute;
@@ -780,12 +759,26 @@ function generarVistaImpresionCompleta($registro, $procesos, $cliente_info) {
             background: #fff3cd;
             border-left: 4px solid #ffc107;
             border-radius: 4px;
-            font-size: 7.5pt;
+            font-size: 7.5pt; /* Reducido */
+        }
+        
+        /* AJUSTES ESPECÍFICOS PARA MEJOR AJUSTE */
+        .contenedor-pagina > div:not(.botones-contenedor) {
+            margin-bottom: 8px;
+        }
+        
+        /* Asegurar que las tablas internas también se ajusten */
+        .tabla-detalles table {
+            width: 100% !important;
+            font-size: 7.5pt !important;
         }
     </style>
 </head>
 <body>
 
+<!-- El resto del código HTML/PHP permanece EXACTAMENTE IGUAL -->
+<!-- Solo se modificaron los estilos CSS arriba -->
+    
     <!-- BOTONES (solo en pantalla) -->
     <div class="no-print botones-contenedor">
         <button class="btn btn-excel" onclick="descargarExcel()">
@@ -826,23 +819,11 @@ function generarVistaImpresionCompleta($registro, $procesos, $cliente_info) {
             <tbody>
                 <?php foreach ($procesos as $p): 
                     $clase = '';
-                    // VERSIÓN PHP 7.4 - sin match()
                     switch($p['proceso']) {
-                        case 'Recepción':
-                            $clase = 'recepcion';
-                            break;
-                        case 'Almacenaje':
-                            $clase = 'almacenaje';
-                            break;
-                        case 'Despacho':
-                            $clase = 'despacho';
-                            break;
-                        case 'Otros':
-                            $clase = 'otros';
-                            break;
-                        default:
-                            $clase = '';
-                            break;
+                        case 'Recepción': $clase = 'recepcion'; break;
+                        case 'Almacenaje': $clase = 'almacenaje'; break;
+                        case 'Despacho': $clase = 'despacho'; break;
+                        case 'Otros': $clase = 'otros'; break;
                     }
                 ?>
                 <tr class="<?php echo $clase; ?>">
@@ -1040,8 +1021,8 @@ function generarVistaImpresionCompleta($registro, $procesos, $cliente_info) {
                 '5.1.' => 'El servicio ofertado por RANSA considera (1) un inventario wall to wall al mes',
                 '5.2.' => 'Las diferencias negativas se netean con las diferencias positivas y la diferencia real se ajusta a precio FABRICA de la mercadería a ser descontada por RANSA.',
                 '5.3.' => 'Se recomienda para los inventarios mensuales el paralizar las operaciones (No se recepcionan y no se despacha) y 1 día antes se disminuye la capacidad de atención para adecuar el stock para el inventario.',
-                '5.4.' => 'El cliente deberá realizar su ajuste a su sistema para empezar el siguiente mes con un inventario saneado entre ambas partes.',
-                '5.5.' => 'La recuperación de productos dañados no está considerado dentro del alcance del servicio.'
+                '5.3.' => 'El cliente deberá realizar su ajuste a su sistema para empezar el siguiente mes con un inventario saneado entre ambas partes.',
+                '5.3.' => 'La recuperación de productos dañados no está considerado dentro del alcance del servicio.'
             ];
             
             foreach ($inventario_items as $item => $desc):

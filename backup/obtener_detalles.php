@@ -1,5 +1,5 @@
 <?php
-// obtener_detalles.php - DEVUELVE HTML FORMATEADO
+// obtener_detalles.php - VERSIÓN SIMPLIFICADA
 session_start();
 require_once 'conexion.php';
 
@@ -145,8 +145,6 @@ function generarTablaTarifas($registro) {
             'frecuencia' => 'Por evento',
             'valor' => $registro[' carga_pall'] ?? '0,00'
         ],
-        
-        
         [
             'nro' => 12,
             'proceso' => 'Despacho',
@@ -156,7 +154,6 @@ function generarTablaTarifas($registro) {
             'frecuencia' => 'Por evento',
             'valor' => $registro[' estibaje_cajas'] ?? '0,00'
         ],
-
         [
             'nro' => 13,
             'proceso' => 'Otros',
@@ -172,7 +169,7 @@ function generarTablaTarifas($registro) {
     $cliente_info = htmlspecialchars($registro[' almacen'] ?? 'Cliente') . ' - ' . 
                    htmlspecialchars($registro[' ciudad'] ?? 'Ciudad');
     
-    // Generar HTML
+    // Generar HTML SOLO CON LA TABLA PRINCIPAL
     $html = '
     <div class="tarifas-reporte">
         <div class="reporte-header mb-4">
@@ -262,82 +259,9 @@ function generarTablaTarifas($registro) {
                 <i class="fas fa-exclamation-circle"></i> <strong>Nota2.-</strong> Los precios están con punto (,) decimal
             </div>
         </div>
-        
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="card border-primary">
-                    <div class="card-header bg-primary text-white py-1" style="font-size: 12px;">
-                        <i class="fas fa-chart-line"></i> Resumen Tarifario
-                    </div>
-                    <div class="card-body py-2">
-                        <table class="table table-sm mb-0">
-                            <tr>
-                                <td>Procesos Recepción:</td>
-                                <td class="text-end">4</td>
-                            </tr>
-                            <tr>
-                                <td>Procesos Almacenaje:</td>
-                                <td class="text-end">2</td>
-                            </tr>
-                            <tr>
-                                <td>Procesos Despacho:</td>
-                                <td class="text-end">4</td>
-                            </tr>
-                            <tr>
-                                <td>Procesos Otros:</td>
-                                <td class="text-end">2</td>
-                            </tr>
-                            <tr class="table-active">
-                                <td><strong>Total Procesos:</strong></td>
-                                <td class="text-end"><strong>12</strong></td>
-                            </tr>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card border-success">
-                    <div class="card-header bg-success text-white py-1" style="font-size: 12px;">
-                        <i class="fas fa-dollar-sign"></i> Totales por Proceso
-                    </div>
-                    <div class="card-body py-2">
-                        <table class="table table-sm mb-0">
-                            <tr>
-                                <td>Total Recepción:</td>
-                                <td class="text-end">$ ' . calcularTotalProceso($procesos, 'Recepción') . '</td>
-                            </tr>
-                            <tr>
-                                <td>Total Almacenaje:</td>
-                                <td class="text-end">$ ' . calcularTotalProceso($procesos, 'Almacenaje') . '</td>
-                            </tr>
-                            <tr>
-                                <td>Total Despacho:</td>
-                                <td class="text-end">$ ' . calcularTotalProceso($procesos, 'Despacho') . '</td>
-                            </tr>
-                            <tr>
-                                <td>Total Otros:</td>
-                                <td class="text-end">$ ' . calcularTotalProceso($procesos, 'Otros') . '</td>
-                            </tr>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>';
     
     return $html;
-}
-
-// Función auxiliar para calcular totales
-function calcularTotalProceso($procesos, $tipo) {
-    $total = 0;
-    foreach ($procesos as $proceso) {
-        if ($proceso['proceso'] == $tipo) {
-            $valor = str_replace(',', '.', $proceso['valor']);
-            $total += floatval($valor);
-        }
-    }
-    return number_format($total, 2, ',', '');
 }
 
 echo json_encode(['success' => false, 'message' => 'Método no permitido']);

@@ -2,23 +2,31 @@
 // index.php - SISTEMA SIMPLIFICADO CON TABLA DATATABLES
 session_start();
 
-// Configuración de conexión
-$host = "Jorgeserver.database.windows.net";
-$dbname = "DPL";
-$username = "Jmmc";
-$password = "ChaosSoldier01";
-
-// Conexión a la base de datos
-try {
-    $pdo = new PDO(
-        "sqlsrv:Server=$host;Database=$dbname",
-        $username,
-        $password,
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-    );
-} catch(PDOException $e) {
-    die("Error de conexión: " . $e->getMessage());
+// ===== VERIFICAR SI EL USUARIO ESTÁ LOGUEADO (USANDO NUESTRA SESIÓN) =====
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_name'])) {
+    header("Location: login.php");
+    exit;
 }
+// ===== FIN VERIFICACIÓN =====
+
+// ===== Validar si usuario puede crear opciones basado en id_perfil =====
+$puede_crear_opciones = false;
+if (isset($_SESSION['id_perfil'])) {
+    if ($_SESSION['id_perfil'] == 2) {
+        $puede_crear_opciones = true;
+    }
+}
+// ===== FIN VALIDACIÓN =====
+
+// Incluir conexión
+require_once 'conexion.php';
+
+// Obtener datos del usuario desde la sesión
+$user_id = $_SESSION['user_id'];
+$user_name = $_SESSION['user_name'];
+$user_email = $_SESSION['user_email'];
+$user_type = $_SESSION['user_type'];
+$user_color = $_SESSION['user_color'] ?? '#009A3F'; // Color por defecto si no existe
 
 // Obtener filtros únicos para los dropdowns
 $servicios = [];
@@ -28,31 +36,46 @@ $utds = [];
 
 try {
     // Servicios únicos
-    $stmt = $pdo->query("SELECT DISTINCT servicio FROM externos.CotizadorTarifas WHERE servicio IS NOT NULL ORDER BY servicio");
-    $servicios = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $stmt = sqlsrv_query($conn, "SELECT DISTINCT servicio FROM externos.CotizadorTarifas WHERE servicio IS NOT NULL ORDER BY servicio");
+    if ($stmt === false) {
+        die(print_r(sqlsrv_errors(), true));
+    }
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $servicios[] = $row['servicio'];
+    }
     
     // Gestiones únicas
-    $stmt = $pdo->query("SELECT DISTINCT [ gestion] FROM externos.CotizadorTarifas WHERE [ gestion] IS NOT NULL ORDER BY [ gestion] DESC");
-    $gestiones = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $stmt = sqlsrv_query($conn, "SELECT DISTINCT [ gestion] FROM externos.CotizadorTarifas WHERE [ gestion] IS NOT NULL ORDER BY [ gestion] DESC");
+    if ($stmt === false) {
+        die(print_r(sqlsrv_errors(), true));
+    }
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $gestiones[] = $row[' gestion'];
+    }
     
     // Almacenes únicos
-    $stmt = $pdo->query("SELECT DISTINCT [ almacen] FROM externos.CotizadorTarifas WHERE [ almacen] IS NOT NULL ORDER BY [ almacen]");
-    $almacenes = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $stmt = sqlsrv_query($conn, "SELECT DISTINCT [ almacen] FROM externos.CotizadorTarifas WHERE [ almacen] IS NOT NULL ORDER BY [ almacen]");
+    if ($stmt === false) {
+        die(print_r(sqlsrv_errors(), true));
+    }
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $almacenes[] = $row[' almacen'];
+    }
     
     // UTDs únicos
-    $stmt = $pdo->query("SELECT DISTINCT [ utd] FROM externos.CotizadorTarifas WHERE [ utd] IS NOT NULL ORDER BY [ utd]");
-    $utds_raw = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    
-    // Convertir UTDs a porcentajes
-    $utds = [];
-    foreach ($utds_raw as $utd_valor) {
+    $stmt = sqlsrv_query($conn, "SELECT DISTINCT [ utd] FROM externos.CotizadorTarifas WHERE [ utd] IS NOT NULL ORDER BY [ utd]");
+    if ($stmt === false) {
+        die(print_r(sqlsrv_errors(), true));
+    }
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $utd_valor = $row[' utd'];
         if ($utd_valor !== null && $utd_valor !== '') {
             $porcentaje = convertirAPorcentaje($utd_valor);
             $utds[$utd_valor] = $porcentaje;
         }
     }
     
-} catch(PDOException $e) {
+} catch(Exception $e) {
     $error = "Error al obtener filtros: " . $e->getMessage();
 }
 
@@ -109,25 +132,39 @@ $sql .= " ORDER BY id DESC";
 
 try {
     if (!empty($params)) {
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
+        // Preparar consulta con parámetros
+        $stmt = sqlsrv_prepare($conn, $sql, $params);
+        if ($stmt === false) {
+            die(print_r(sqlsrv_errors(), true));
+        }
+        if (!sqlsrv_execute($stmt)) {
+            die(print_r(sqlsrv_errors(), true));
+        }
     } else {
-        $stmt = $pdo->query($sql);
+        $stmt = sqlsrv_query($conn, $sql);
+        if ($stmt === false) {
+            die(print_r(sqlsrv_errors(), true));
+        }
     }
     
-    $registros = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $registros = [];
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $registros[] = $row;
+    }
+    
     $_SESSION['cotizador_tarifas_cache'] = $registros;
     
-} catch(PDOException $e) {
+} catch(Exception $e) {
     $error = "Error al obtener registros: " . $e->getMessage();
     $registros = [];
 }
 
-// Simular datos de sesión para el diseño
-$_SESSION['gb_nombre'] = $_SESSION['gb_nombre'] ?? 'Usuario Sistema';
+
+
+
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -247,7 +284,7 @@ $_SESSION['gb_nombre'] = $_SESSION['gb_nombre'] ?? 'Usuario Sistema';
     /* FILTROS */
     .filter-container {
         background: #f8f9fa;
-        padding: 10px;s
+        padding: 10px;
         border-radius: 2px;
         margin-bottom: 2px;
         border: 1px solid #e9ecef;
@@ -455,6 +492,39 @@ $_SESSION['gb_nombre'] = $_SESSION['gb_nombre'] ?? 'Usuario Sistema';
         100% { transform: rotate(360deg); }
     }
     
+    /* NUEVO ESTILO PARA LA OPCIÓN CREAR REGISTRO (solo para id_perfil = 2) */
+    .menu-crear-registro {
+        background: linear-gradient(135deg, #009A3F, #009A3F);
+  
+    }
+    
+    .menu-crear-registro a {
+        color: white ;
+        font-weight: 600 ;
+    }
+    
+    .menu-crear-registro i {
+        color: white ;
+    }
+    
+    .menu-crear-registro:hover {
+        background: linear-gradient(135deg, #f39c12, #e67e22) ;
+    }
+    
+    /* AVATAR DEL USUARIO CON SU COLOR */
+    .user-avatar-circle {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 16px;
+        margin-right: 10px;
+    }
+    
     /* RESPONSIVE */
     @media (max-width: 768px) {
         .nav-title {
@@ -494,7 +564,7 @@ $_SESSION['gb_nombre'] = $_SESSION['gb_nombre'] ?? 'Usuario Sistema';
         <div class="left_col scroll-view">
           <div class="navbar nav_title" style="border: 0;">
             <a href="index.php" class="site_title">
-              <i class="fa fa-file-invoice-dollar"></i> <span>Cotizador Tarifas</span>
+              <img src="img/ransa.png" alt="LOGIRAN S.A." style="height: 40px;">
             </a>
           </div>
 
@@ -502,13 +572,12 @@ $_SESSION['gb_nombre'] = $_SESSION['gb_nombre'] ?? 'Usuario Sistema';
 
           <div class="profile clearfix">
             <div class="profile_pic">
-              <div style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #009A3F, #00c853); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px;">
-                <i class="fa fa-user"></i>
-              </div>
+              
             </div>
             <div class="profile_info">
               <span>Bienvenido,</span>
-              <h2><?php echo $_SESSION['gb_nombre']; ?></h2>
+              <h2><?php echo htmlspecialchars($user_name); ?></h2>
+              <small><?php echo htmlspecialchars($user_type); ?></small>
             </div>
           </div>
 
@@ -522,8 +591,20 @@ $_SESSION['gb_nombre'] = $_SESSION['gb_nombre'] ?? 'Usuario Sistema';
                 <li class="active">
                   <a href="index.php"><i class="fa fa-home"></i> Inicio</a>
                 </li>
+                
+                <!-- ===== OPCIÓN: CREAR REGISTRO (Solo para usuarios con id_perfil = 2) ===== -->
+                <?php if ($puede_crear_opciones): ?>
+                <li class="menu-crear-registro">
+                  <a href="crear_registro.php">
+                    <i class="fa fa-plus-circle"></i> Crear Registro
+                    <span class="fa fa-chevron-right" style="float: right;"></span>
+                  </a>
+                </li>
+                <?php endif; ?>
+                <!-- ===== FIN OPCIÓN ===== -->
+                
                 <li>
-                  <a href="#"><i class="fa fa-sign-out"></i> Cerrar Sesión</a>
+                  <a href="logout.php"><i class="fa fa-sign-out"></i> Cerrar Sesión</a>
                 </li>
               </ul>
             </div>
@@ -540,7 +621,7 @@ $_SESSION['gb_nombre'] = $_SESSION['gb_nombre'] ?? 'Usuario Sistema';
             <a data-toggle="tooltip" data-placement="top" title="Recargar" onclick="reloadPage()">
               <span class="fa fa-refresh"></span>
             </a>
-            <a data-toggle="tooltip" data-placement="top" title="Cerrar Sesión">
+            <a data-toggle="tooltip" data-placement="top" title="Cerrar Sesión" href="logout.php">
               <span class="fa fa-power-off"></span>
             </a>
           </div>
@@ -563,17 +644,17 @@ $_SESSION['gb_nombre'] = $_SESSION['gb_nombre'] ?? 'Usuario Sistema';
             <ul class="navbar-right">
               <li class="nav-item dropdown open">
                 <a href="javascript:;" class="user-profile dropdown-toggle" id="navbarDropdown" data-toggle="dropdown">
-                  <div style="display: inline-flex; align-items: center; background: #28a745; width: 26px; height: 26px; border-radius: 50%; justify-content: center; margin-right: 8px;">
-                    <i class="fa fa-user" style="color: white; font-size: 12px;"></i>
+                  <div class="user-avatar-circle" style="background: <?php echo htmlspecialchars($user_color); ?>; width: 32px; height: 20px; margin-right: 8px;">
+                    <?php echo strtoupper(substr($user_name, 0, 1)); ?>
                   </div>
-                  <?php echo $_SESSION['gb_nombre']; ?>
+                  <?php echo htmlspecialchars($user_name); ?>
                   <span class="fa fa-angle-down"></span>
                 </a>
                 <div class="dropdown-menu dropdown-usermenu pull-right" aria-labelledby="navbarDropdown">
                   <a class="dropdown-item" href="#"><i class="fa fa-user pull-right"></i> Perfil</a>
                   <a class="dropdown-item" href="#"><i class="fa fa-cog pull-right"></i> Configuración</a>
                   <div class="dropdown-divider"></div>
-                  <a class="dropdown-item" href="#"><i class="fa fa-sign-out pull-right"></i> Salir</a>
+                  <a class="dropdown-item" href="logout.php"><i class="fa fa-sign-out pull-right"></i> Salir</a>
                 </div>
               </li>
             </ul>
@@ -747,51 +828,49 @@ $_SESSION['gb_nombre'] = $_SESSION['gb_nombre'] ?? 'Usuario Sistema';
       <!-- FOOTER -->
       <footer>
         <div class="pull-right">
-          Sistema de Cotización de Tarifas © <?php echo date('Y') ?>
+          Sistema de Cotización de Tarifas © <?php echo date('Y') ?> | Usuario: <?php echo htmlspecialchars($user_name); ?>
         </div>
         <div class="clearfix"></div>
       </footer>
     </div>
   </div>
 
-<!-- MODAL PARA REPORTE - ACTUALIZADO CON BOTONES DE EXPORTACIÓN -->
-<div class="modal fade reporte-modal" id="reporteModal" tabindex="-1">
+  <!-- MODAL PARA REPORTE - ACTUALIZADO CON BOTONES DE EXPORTACIÓN -->
+  <div class="modal fade reporte-modal" id="reporteModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header modal-header-success">
-                <h5 class="modal-title"><i class="fa fa-file-invoice-dollar"></i> Reporte de Tarifas</h5>
-                <button type="button" class="close" data-dismiss="modal" style="color: white; opacity: 0.8;">
-                    <span>&times;</span>
-                </button>
-            </div>
-            <div class="modal-body p-3">
-                <div id="reporte-container">
-                    <div class="text-center py-4">
-                        <i class="fa fa-spinner fa-spin fa-2x" style="color: #009A3F;"></i>
-                        <p class="mt-2">Cargando reporte...</p>
-                    </div>
-                </div>
-            </div>
-            
-<div class="modal-footer">
-    <button type="button" class="btn btn-secondary" data-dismiss="modal">
-        <i class="fa fa-times"></i> Cerrar
-    </button>
-    <button type="button" class="btn btn-info" id="btn-exportar-excel">
-        <i class="fa fa-file-excel"></i> Exportar Excel
-    </button>
-    <button type="button" class="btn btn-danger" id="btn-exportar-pdf">
-        <i class="fa fa-file-pdf"></i> Exportar PDF
-    </button>
-    <button type="button" class="btn btn-success" id="btn-imprimir-reporte">
-        <i class="fa fa-print"></i> Imprimir
-    </button>
-</div>
+      <div class="modal-content">
+        <div class="modal-header modal-header-success">
+          <h5 class="modal-title"><i class="fa fa-file-invoice-dollar"></i> Reporte de Tarifas</h5>
+          <button type="button" class="close" data-dismiss="modal" style="color: white; opacity: 0.8;">
+            <span>&times;</span>
+          </button>
         </div>
+        <div class="modal-body p-3">
+          <div id="reporte-container">
+            <div class="text-center py-4">
+              <i class="fa fa-spinner fa-spin fa-2x" style="color: #009A3F;"></i>
+              <p class="mt-2">Cargando reporte...</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">
+            <i class="fa fa-times"></i> Cerrar
+          </button>
+          <button type="button" class="btn btn-info" id="btn-exportar-excel">
+            <i class="fa fa-file-excel"></i> Exportar Excel
+          </button>
+          <button type="button" class="btn btn-danger" id="btn-exportar-pdf">
+            <i class="fa fa-file-pdf"></i> Exportar PDF
+          </button>
+          <button type="button" class="btn btn-success" id="btn-imprimir-reporte">
+            <i class="fa fa-print"></i> Imprimir
+          </button>
+        </div>
+      </div>
     </div>
-</div>
-
-
+  </div>
 
   <!-- SCRIPTS GENTEELLA -->
   <script src="vendors/jquery/dist/jquery.min.js"></script>
@@ -812,6 +891,13 @@ $_SESSION['gb_nombre'] = $_SESSION['gb_nombre'] ?? 'Usuario Sistema';
     
     function hideLoading() {
       $('#loadingOverlay').fadeOut();
+    }
+    
+    // Función para cerrar sesión
+    function cerrarSesion() {
+        if (confirm('¿Estás seguro de que deseas cerrar sesión?')) {
+            window.location.href = 'logout.php';
+        }
     }
     
     // Inicializar Select2
@@ -879,16 +965,20 @@ $_SESSION['gb_nombre'] = $_SESSION['gb_nombre'] ?? 'Usuario Sistema';
       }, 300);
     });
     
-    // Manejar clic en botón de reporte
+    // Guardar el ID actual cuando se abre el modal
+    var registroActual = null;
+    
     $(document).on('click', '.ver-detalles', function(e) {
       e.preventDefault();
       e.stopPropagation();
       
-      const id = $(this).data('id');
-      const servicio = $(this).data('servicio');
-      const gestion = $(this).data('gestion');
-      const almacen = $(this).data('almacen');
-      const utd = $(this).data('utd');
+      registroActual = {
+        id: $(this).data('id'),
+        servicio: $(this).data('servicio'),
+        gestion: $(this).data('gestion'),
+        almacen: $(this).data('almacen'),
+        utd: $(this).data('utd')
+      };
       
       $('#reporteModal').modal('show');
       $('#reporte-container').html(`
@@ -904,11 +994,11 @@ $_SESSION['gb_nombre'] = $_SESSION['gb_nombre'] ?? 'Usuario Sistema';
         method: 'POST',
         data: {
           accion: 'obtener_detalles',
-          id: id,
-          servicio: servicio,
-          gestion: gestion,
-          almacen: almacen,
-          utd: utd
+          id: registroActual.id,
+          servicio: registroActual.servicio,
+          gestion: registroActual.gestion,
+          almacen: registroActual.almacen,
+          utd: registroActual.utd
         },
         dataType: 'json',
         beforeSend: function() {
@@ -936,215 +1026,119 @@ $_SESSION['gb_nombre'] = $_SESSION['gb_nombre'] ?? 'Usuario Sistema';
         }
       });
     });
-    var registroActual = null;
     
-    // Imprimir reporte
-    $(document).on('click', '#btn-imprimir-reporte', function() {
-      const printContent = $('#reporte-container').html();
-      const ventanaImpresion = window.open('', '_blank');
+    // 1. BOTÓN EXCEL
+    $(document).on('click', '#btn-exportar-excel', function() {
+      if (!registroActual || !registroActual.id) {
+        alert('No hay registro seleccionado');
+        return;
+      }
       
-      ventanaImpresion.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Reporte de Tarifas</title>
-          <meta charset="UTF-8">
-          <style>
-            @page { size: landscape; margin: 10mm; }
-            body { 
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-              font-size: 11px; 
-              color: #000;
-              margin: 0;
-              padding: 10px;
-            }
-            .tarifas-reporte {
-              width: 100%;
-            }
-            .reporte-header {
-              background: #f8f9fa;
-              padding: 10px;
-              border-radius: 5px;
-              border-left: 4px solid #009A3F;
-              margin-bottom: 15px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 10px;
-              font-size: 10px;
-            }
-            th, td {
-              border: 1px solid #ddd;
-              padding: 5px;
-              text-align: left;
-            }
-            th {
-              background-color: #2c3e50 !important;
-              color: white !important;
-              font-weight: bold;
-            }
-            .text-end { text-align: right; }
-            .text-center { text-align: center; }
-            .badge {
-              padding: 3px 7px;
-              border-radius: 3px;
-              font-size: 0.8em;
-            }
-            .alert {
-              padding: 8px;
-              margin-bottom: 8px;
-              border-radius: 4px;
-              font-size: 10px;
-            }
-            .no-print { display: none !important; }
-          </style>
-        </head>
-        <body>${printContent}</body>
-        </html>
-      `);
+      // Crear formulario oculto
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = 'generar_reporte.php';
+      form.target = '_blank';
       
-      ventanaImpresion.document.close();
-      ventanaImpresion.focus();
+      // Agregar campos
+      const accionInput = document.createElement('input');
+      accionInput.type = 'hidden';
+      accionInput.name = 'accion';
+      accionInput.value = 'exportar';
       
-      setTimeout(function() {
-        ventanaImpresion.print();
-      }, 500);
+      const idInput = document.createElement('input');
+      idInput.type = 'hidden';
+      idInput.name = 'id';
+      idInput.value = registroActual.id;
+      
+      const formatoInput = document.createElement('input');
+      formatoInput.type = 'hidden';
+      formatoInput.name = 'formato';
+      formatoInput.value = 'excel';
+      
+      form.appendChild(accionInput);
+      form.appendChild(idInput);
+      form.appendChild(formatoInput);
+      
+      // Enviar formulario
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
     });
-    // ========== FUNCIONALIDAD PARA LOS 3 BOTONES ==========
-// ========== FUNCIONALIDAD PARA LOS 3 BOTONES ==========
-
-// Guardar datos del registro actual
-var registroActual = null;
-
-// Cuando se hace clic en "Ver Reporte", guardar datos
-$(document).on('click', '.ver-detalles', function(e) {
-    registroActual = {
-        id: $(this).data('id'),
-        servicio: $(this).data('servicio'),
-        gestion: $(this).data('gestion'),
-        almacen: $(this).data('almacen'),
-        utd: $(this).data('utd')
-    };
-});
-
-// 1. BOTÓN EXCEL
-$(document).on('click', '#btn-exportar-excel', function() {
-    if (!registroActual || !registroActual.id) {
+    
+    // 2. BOTÓN PDF
+    $(document).on('click', '#btn-exportar-pdf', function() {
+      if (!registroActual || !registroActual.id) {
         alert('No hay registro seleccionado');
         return;
-    }
+      }
+      
+      // Abrir en nueva pestaña
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = 'generar_reporte.php';
+      form.target = '_blank';
+      
+      const accionInput = document.createElement('input');
+      accionInput.type = 'hidden';
+      accionInput.name = 'accion';
+      accionInput.value = 'exportar';
+      
+      const idInput = document.createElement('input');
+      idInput.type = 'hidden';
+      idInput.name = 'id';
+      idInput.value = registroActual.id;
+      
+      const formatoInput = document.createElement('input');
+      formatoInput.type = 'hidden';
+      formatoInput.name = 'formato';
+      formatoInput.value = 'pdf';
+      
+      form.appendChild(accionInput);
+      form.appendChild(idInput);
+      form.appendChild(formatoInput);
+      
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+    });
     
-    // Crear formulario oculto
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = 'generar_reporte.php';
-    form.target = '_blank';
-    
-    // Agregar campos
-    const accionInput = document.createElement('input');
-    accionInput.type = 'hidden';
-    accionInput.name = 'accion';
-    accionInput.value = 'exportar';
-    
-    const idInput = document.createElement('input');
-    idInput.type = 'hidden';
-    idInput.name = 'id';
-    idInput.value = registroActual.id;
-    
-    const formatoInput = document.createElement('input');
-    formatoInput.type = 'hidden';
-    formatoInput.name = 'formato';
-    formatoInput.value = 'excel';
-    
-    form.appendChild(accionInput);
-    form.appendChild(idInput);
-    form.appendChild(formatoInput);
-    
-    // Enviar formulario
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-});
-
-// 2. BOTÓN PDF
-$(document).on('click', '#btn-exportar-pdf', function() {
-    if (!registroActual || !registroActual.id) {
+    // 3. BOTÓN IMPRIMIR
+    $(document).on('click', '#btn-imprimir-reporte', function() {
+      if (!registroActual || !registroActual.id) {
         alert('No hay registro seleccionado');
         return;
-    }
+      }
+      
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = 'generar_reporte.php';
+      form.target = '_blank';
+      
+      const accionInput = document.createElement('input');
+      accionInput.type = 'hidden';
+      accionInput.name = 'accion';
+      accionInput.value = 'exportar';
+      
+      const idInput = document.createElement('input');
+      idInput.type = 'hidden';
+      idInput.name = 'id';
+      idInput.value = registroActual.id;
+      
+      const formatoInput = document.createElement('input');
+      formatoInput.type = 'hidden';
+      formatoInput.name = 'formato';
+      formatoInput.value = 'imprimir';
+      
+      form.appendChild(accionInput);
+      form.appendChild(idInput);
+      form.appendChild(formatoInput);
+      
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+    });
     
-    // Abrir en nueva pestaña
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = 'generar_reporte.php';
-    form.target = '_blank';
-    
-    const accionInput = document.createElement('input');
-    accionInput.type = 'hidden';
-    accionInput.name = 'accion';
-    accionInput.value = 'exportar';
-    
-    const idInput = document.createElement('input');
-    idInput.type = 'hidden';
-    idInput.name = 'id';
-    idInput.value = registroActual.id;
-    
-    const formatoInput = document.createElement('input');
-    formatoInput.type = 'hidden';
-    formatoInput.name = 'formato';
-    formatoInput.value = 'imprimir';
-    
-    form.appendChild(accionInput);
-    form.appendChild(idInput);
-    form.appendChild(formatoInput);
-    
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-});
-
-// 3. BOTÓN IMPRIMIR
-$(document).on('click', '#btn-imprimir-reporte', function() {
-    if (!registroActual || !registroActual.id) {
-        alert('No hay registro seleccionado');
-        return;
-    }
-    
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = 'generar_reporte.php';
-    form.target = '_blank';
-    
-    const accionInput = document.createElement('input');
-    accionInput.type = 'hidden';
-    accionInput.name = 'accion';
-    accionInput.value = 'exportar';
-    
-    const idInput = document.createElement('input');
-    idInput.type = 'hidden';
-    idInput.name = 'id';
-    idInput.value = registroActual.id;
-    
-    const formatoInput = document.createElement('input');
-    formatoInput.type = 'hidden';
-    formatoInput.name = 'formato';
-    formatoInput.value = 'imprimir';
-    
-    form.appendChild(accionInput);
-    form.appendChild(idInput);
-    form.appendChild(formatoInput);
-    
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-});
-
-// Guardar el ID actual cuando se abre el modal
-$(document).on('click', '.ver-detalles', function(e) {
-    const id = $(this).data('id');
-    $('#reporteModal').data('current-id', id);
-});
     // Funciones de ayuda
     function toggleFullScreen() {
       if (!document.fullscreenElement) {

@@ -1,5 +1,5 @@
 <?php
-// generar_reporte.php - VERSIÓN COMPATIBLE CON PHP 7.4 CON SQLSRV
+// generar_reporte.php - VERSIÓN COMPATIBLE CON PHP 7.4
 session_start();
 require_once 'conexion.php';
 require_once 'vendor/autoload.php';
@@ -11,19 +11,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     
     if ($id > 0) {
         try {
-            // Buscar registro por ID con SQLSRV
-            $sql = "SELECT * FROM externos.CotizadorTarifas WHERE id = ?";
-            $stmt = sqlsrv_prepare($conn, $sql, array(&$id));
-            
-            if ($stmt === false) {
-                die('Error al preparar consulta: ' . print_r(sqlsrv_errors(), true));
-            }
-            
-            if (!sqlsrv_execute($stmt)) {
-                die('Error al ejecutar consulta: ' . print_r(sqlsrv_errors(), true));
-            }
-            
-            $registro = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+            // Buscar registro por ID
+            $stmt = $pdo->prepare("SELECT * FROM externos.CotizadorTarifas WHERE id = ?");
+            $stmt->execute([$id]);
+            $registro = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($registro) {
                 // Procesos mapeados
@@ -57,14 +48,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
                         generarVistaImpresionCompleta($registro, $procesos, $cliente_info);
                 }
                 
-                // Liberar recursos
-                sqlsrv_free_stmt($stmt);
-                
             } else {
                 die('No se encontró el registro');
             }
             
-        } catch(Exception $e) {
+        } catch(PDOException $e) {
             die('Error en la base de datos: ' . $e->getMessage());
         }
     } else {
