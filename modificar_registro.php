@@ -1,5 +1,5 @@
 <?php
-// crear_registro.php - SISTEMA DE CREACIÓN DE NUEVAS TARIFAS CON MODO ESPECIAL Y GUID
+// modificar_registro.php - SISTEMA DE MODIFICACIÓN DE REGISTROS EXISTENTES CON TABLA DATATABLES
 session_start();
 require_once 'conexion.php';
 
@@ -9,16 +9,16 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_name'])) {
     exit;
 }
 
-// ===== Validar si usuario puede crear opciones basado en id_perfil =====
-$puede_crear_registro = false;
+// ===== Validar si usuario puede modificar registros basado en id_perfil =====
+$puede_modificar_registro = false;
 if (isset($_SESSION['id_perfil'])) {
     if ($_SESSION['id_perfil'] == 2) {
-        $puede_crear_registro = true;
+        $puede_modificar_registro = true;
     }
 }
 
 // Si no tiene permiso, redirigir al index
-if (!$puede_crear_registro) {
+if (!$puede_modificar_registro) {
     header("Location: index.php");
     exit;
 }
@@ -32,7 +32,7 @@ $user_type = $_SESSION['user_type'];
 $user_color = $_SESSION['user_color'] ?? '#009A3F';
 
 // Obtener valores únicos para dropdowns
-$servicios = $ciudades = $almacenes = $gestiones = [];
+$servicios = $ciudades = $almacenes = $gestiones = $utds = [];
 
 try {
     $stmt = sqlsrv_query($conn, "SELECT DISTINCT servicio FROM externos.CotizadorTarifas WHERE servicio IS NOT NULL ORDER BY servicio");
@@ -54,8 +54,152 @@ try {
     while ($stmt && $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
         $gestiones[] = $row[' gestion'];
     }
+    
+    // UTDs únicos
+    $stmt = sqlsrv_query($conn, "SELECT DISTINCT [ utd] FROM externos.CotizadorTarifas WHERE [ utd] IS NOT NULL ORDER BY [ utd]");
+    while ($stmt && $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $utd_valor = $row[' utd'];
+        if ($utd_valor !== null && $utd_valor !== '') {
+            $porcentaje = convertirAPorcentaje($utd_valor);
+            $utds[$utd_valor] = $porcentaje;
+        }
+    }
 } catch(Exception $e) {
     // Error silencioso
+}
+
+// Función para convertir valor a porcentaje
+function convertirAPorcentaje($valor) {
+    if ($valor === null || $valor === '') return '';
+    
+    $valor_limpio = str_replace(',', '.', trim($valor));
+    $float_valor = floatval($valor_limpio);
+    $porcentaje = $float_valor * 100;
+    
+    if ($porcentaje == intval($porcentaje)) {
+        return intval($porcentaje) . '%';
+    } else {
+        return number_format($porcentaje, 2, ',', '') . '%';
+    }
+}
+
+// Aplicar filtros si existen
+$where = [];
+$params = [];
+
+$filtro_servicio = $_GET['servicio'] ?? '';
+$filtro_gestion = $_GET['gestion'] ?? '';
+$filtro_almacen = $_GET['almacen'] ?? '';
+$filtro_utd = $_GET['utd'] ?? '';
+
+if ($filtro_servicio) {
+    $where[] = "servicio = ?";
+    $params[] = $filtro_servicio;
+}
+
+if ($filtro_gestion) {
+    $where[] = "[ gestion] = ?";
+    $params[] = $filtro_gestion;
+}
+
+if ($filtro_almacen) {
+    $where[] = "[ almacen] = ?";
+    $params[] = $filtro_almacen;
+}
+
+if ($filtro_utd) {
+    $where[] = "[ utd] = ?";
+    $params[] = $filtro_utd;
+}
+
+// Consulta con filtros
+$sql = "SELECT id, servicio, [ ciudad], [ almacen], [ gestion], [ utd], [modo_especial] FROM externos.CotizadorTarifas";
+if (!empty($where)) {
+    $sql .= " WHERE " . implode(" AND ", $where);
+}
+$sql .= " ORDER BY id DESC";
+
+try {
+    if (!empty($params)) {
+        $stmt = sqlsrv_prepare($conn, $sql, $params);
+        if ($stmt === false) {
+            die(print_r(sqlsrv_errors(), true));
+        }
+        if (!sqlsrv_execute($stmt)) {
+            die(print_r(sqlsrv_errors(), true));
+        }
+    } else {
+        $stmt = sqlsrv_query($conn, $sql);
+        if ($stmt === false) {
+            die(print_r(sqlsrv_errors(), true));
+        }
+    }
+    
+    $registros = [];
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+        $registros[] = $row;
+    }
+    
+} catch(Exception $e) {
+    $error = "Error al obtener registros: " . $e->getMessage();
+    $registros = [];
+}
+
+// Si se envió un ID para modificar directamente (desde la tabla)
+$registro_id = $_GET['id'] ?? 0;
+$registro = null;
+$tarifas_especiales = [];
+$modo_actual = 'normal';
+
+if ($registro_id > 0) {
+    // Si viene un ID, mostrar formulario de modificación
+    try {
+        // Obtener registro principal
+        $sql = "SELECT * FROM externos.CotizadorTarifas WHERE id = ?";
+        $stmt = sqlsrv_prepare($conn, $sql, [$registro_id]);
+        
+        if ($stmt && sqlsrv_execute($stmt)) {
+            $registro = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+            sqlsrv_free_stmt($stmt);
+            
+            if ($registro) {
+                $modo_actual = isset($registro['modo_especial']) && $registro['modo_especial'] == 1 ? 'especial' : 'normal';
+                
+                // Si es modo especial, obtener tarifas especiales
+                if ($modo_actual == 'especial') {
+                    $guid = $registro['ID_Tarifas'] ?? '';
+                    if (!empty($guid)) {
+                        $tablas_posibles = ['DPL.externos.TarifaEspecial', 'externos.TarifaEspecial'];
+                        
+                        foreach ($tablas_posibles as $tabla) {
+                            try {
+                                $sql_especial = "SELECT Servicio, costo, Frecuencia 
+                                                 FROM $tabla 
+                                                 WHERE ID_Tarifa = ? 
+                                                 ORDER BY Servicio";
+                                
+                                $stmt_especial = sqlsrv_prepare($conn, $sql_especial, [$guid]);
+                                if ($stmt_especial !== false && sqlsrv_execute($stmt_especial)) {
+                                    while ($row = sqlsrv_fetch_array($stmt_especial, SQLSRV_FETCH_ASSOC)) {
+                                        $tarifas_especiales[] = $row;
+                                    }
+                                    sqlsrv_free_stmt($stmt_especial);
+                                    
+                                    if (!empty($tarifas_especiales)) {
+                                        break;
+                                    }
+                                }
+                            } catch(Exception $e) {
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } catch(Exception $e) {
+        error_log("Error obteniendo registro: " . $e->getMessage());
+    }
 }
 
 // Función para generar GUID si no existe com_create_guid
@@ -70,11 +214,12 @@ if (!function_exists('com_create_guid')) {
     }
 }
 
-// Guardar después de confirmación (AJAX)
-if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'true') {
+// Guardar modificaciones
+if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] === 'true') {
     header('Content-Type: application/json');
     
     try {
+        $id = (int) ($_POST['id_registro'] ?? 0);
         $servicio = trim($_POST['servicio_final'] ?? '');
         $ciudad = trim($_POST['ciudad_final'] ?? '');
         $almacen = trim($_POST['almacen_final'] ?? '');
@@ -83,19 +228,26 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
         $modo_especial = trim($_POST['modo_especial'] ?? '0');
         
         // Validar campos obligatorios
-        if (empty($servicio) || empty($ciudad) || empty($almacen)) {
-            throw new Exception('Servicio, Ciudad y Almacén son campos obligatorios');
+        if (empty($servicio) || empty($ciudad) || empty($almacen) || $id <= 0) {
+            throw new Exception('Datos incompletos o ID inválido');
         }
         
-        // Generar GUID para modo especial
-        $guid_tarifa = '';
-        if ($modo_especial === '1') {
+        // Iniciar transacción
+        sqlsrv_begin_transaction($conn);
+        
+        $guid_tarifa = $_POST['guid_actual'] ?? '';
+        $cambio_modo = false;
+        
+        if ($modo_especial === '1' && empty($guid_tarifa)) {
             $guid_tarifa = com_create_guid();
-            // Limpiar llaves si las tiene
             $guid_tarifa = trim($guid_tarifa, '{}');
+            $cambio_modo = true;
+        } elseif ($modo_especial === '0' && !empty($guid_tarifa)) {
+            $guid_tarifa = '';
+            $cambio_modo = true;
         }
         
-        // Si NO es modo especial, obtener las tarifas normales
+        // Determinar valores según modo
         if ($modo_especial === '0') {
             $descarga_pall = trim($_POST['descarga_pall'] ?? '0,00');
             $estibaje_cajas = trim($_POST['estibaje_cajas'] ?? '0,00');
@@ -109,7 +261,6 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
             $operacion_und_despacho = trim($_POST['operacion_und_despacho'] ?? '0,00');
             $carga_pall = trim($_POST['carga_pall'] ?? '0,00');
         } else {
-            // Si es modo especial, todos los campos de tarifa van vacíos
             $descarga_pall = '0,00';
             $estibaje_cajas = '0,00';
             $pall_in = '0,00';
@@ -123,29 +274,29 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
             $carga_pall = '0,00';
         }
         
-        // CONSULTA CORREGIDA según tu estructura de BD CON GUID
-        $sql = "INSERT INTO externos.CotizadorTarifas (
-            servicio, 
-            [ ciudad], 
-            [ almacen], 
-            [ pall_in], 
-            [ descarga_pall], 
-            [ operacion_cajas_recepcion], 
-            [ operacion_und_recepcion], 
-            [ almacen_pos], 
-            [ m2_almacen], 
-            [ pall_out], 
-            [ carga_pall], 
-            [ operacion_cajas_despacho], 
-            [ operacion_und_despacho], 
-            [ estibaje_cajas], 
-            [ gestion], 
-            [ utd],
-            [modo_especial],
-            [ID_Tarifas]
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        // ACTUALIZAR REGISTRO PRINCIPAL (ajustar según tu estructura real)
+        $sql_update = "UPDATE externos.CotizadorTarifas SET
+            servicio = ?, 
+            [ ciudad] = ?, 
+            [ almacen] = ?, 
+            [ pall_in] = ?, 
+            [ descarga_pall] = ?, 
+            [ operacion_cajas_recepcion] = ?, 
+            [ operacion_und_recepcion] = ?, 
+            [ almacen_pos] = ?, 
+            [ m2_almacen] = ?, 
+            [ pall_out] = ?, 
+            [ carga_pall] = ?, 
+            [ operacion_cajas_despacho] = ?, 
+            [ operacion_und_despacho] = ?, 
+            [ estibaje_cajas] = ?, 
+            [ gestion] = ?, 
+            [ utd] = ?,
+            [modo_especial] = ?,
+            [ID_Tarifas] = ?
+        WHERE id = ?";
         
-        $params = array(
+        $params_update = array(
             $servicio,
             $ciudad,
             $almacen,
@@ -163,39 +314,42 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
             $gestion,
             $utd,
             $modo_especial,
-            $guid_tarifa
+            $guid_tarifa,
+            $id
         );
         
-        $stmt = sqlsrv_prepare($conn, $sql, $params);
+        $stmt_update = sqlsrv_prepare($conn, $sql_update, $params_update);
         
-        if ($stmt === false) {
-            $errors = sqlsrv_errors();
-            $error_msg = 'Error al preparar consulta SQL';
-            if ($errors) {
-                $error_msg .= ': ' . $errors[0]['message'];
-            }
-            throw new Exception($error_msg);
+        if ($stmt_update === false) {
+            throw new Exception('Error al preparar actualización');
         }
         
-        if (!sqlsrv_execute($stmt)) {
-            $errors = sqlsrv_errors();
-            $error_msg = 'Error al ejecutar consulta SQL';
-            if ($errors) {
-                $error_msg .= ': ' . $errors[0]['message'];
-            }
-            throw new Exception($error_msg);
+        if (!sqlsrv_execute($stmt_update)) {
+            throw new Exception('Error al ejecutar actualización');
         }
         
-        // OBTENER EL ID GENERADO (numérico)
-        $sql_id = "SELECT SCOPE_IDENTITY() AS new_id";
-        $stmt_id = sqlsrv_query($conn, $sql_id);
-        $row_id = sqlsrv_fetch_array($stmt_id, SQLSRV_FETCH_ASSOC);
-        $nuevo_id = $row_id['new_id'];
-        
-        // Si es modo especial, guardar las tarifas especiales con el MISMO GUID
+        // Si es modo especial, manejar tarifas especiales
         if ($modo_especial === '1' && isset($_POST['tarifas_especiales'])) {
             $tarifas_especiales = json_decode($_POST['tarifas_especiales'], true);
             
+            // Eliminar tarifas existentes para este GUID
+            if (!empty($guid_tarifa)) {
+                $tablas_posibles = ['DPL.externos.TarifaEspecial', 'externos.TarifaEspecial'];
+                foreach ($tablas_posibles as $tabla) {
+                    try {
+                        $sql_delete = "DELETE FROM $tabla WHERE ID_Tarifa = ?";
+                        $stmt_delete = sqlsrv_prepare($conn, $sql_delete, [$guid_tarifa]);
+                        if ($stmt_delete) {
+                            sqlsrv_execute($stmt_delete);
+                            sqlsrv_free_stmt($stmt_delete);
+                        }
+                    } catch(Exception $e) {
+                        // Continuar
+                    }
+                }
+            }
+            
+            // Insertar nuevas tarifas especiales
             if (is_array($tarifas_especiales)) {
                 foreach ($tarifas_especiales as $tarifa) {
                     $servicio_tarifa = trim($tarifa['servicio'] ?? '');
@@ -203,62 +357,46 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                     $frecuencia = trim($tarifa['frecuencia'] ?? 'Mensualizado');
                     
                     if (!empty($servicio_tarifa)) {
-                        // Convertir coma a punto para BD
                         $costo_bd = str_replace(',', '.', $costo);
                         
-                        // Determinar tabla correcta
-                        $tabla_especial = 'externos.TarifaEspecial'; // Primero intentar esta
-                        
+                        $tabla_especial = 'externos.TarifaEspecial';
                         $sql_especial = "INSERT INTO $tabla_especial 
                                         (Servicio, costo, ID_Tarifa, Frecuencia, fecha_creacion) 
                                         VALUES (?, ?, ?, ?, GETDATE())";
                         
-                        $params_especial = array(
-                            $servicio_tarifa,
-                            $costo_bd,
-                            $guid_tarifa,  // USAR EL MISMO GUID
-                            $frecuencia
-                        );
-                        
+                        $params_especial = array($servicio_tarifa, $costo_bd, $guid_tarifa, $frecuencia);
                         $stmt_especial = sqlsrv_prepare($conn, $sql_especial, $params_especial);
                         
                         if ($stmt_especial === false) {
-                            // Intentar con otra tabla si falla
                             $tabla_especial = 'DPL.externos.TarifaEspecial';
                             $sql_especial = "INSERT INTO $tabla_especial 
                                             (Servicio, costo, ID_Tarifa, Frecuencia, fecha_creacion) 
                                             VALUES (?, ?, ?, ?, GETDATE())";
-                            
                             $stmt_especial = sqlsrv_prepare($conn, $sql_especial, $params_especial);
                         }
                         
-                        if ($stmt_especial === false) {
-                            error_log("Error preparando tarifa especial: " . print_r(sqlsrv_errors(), true));
-                            continue; // Continuar con la siguiente tarifa
+                        if ($stmt_especial !== false) {
+                            sqlsrv_execute($stmt_especial);
+                            sqlsrv_free_stmt($stmt_especial);
                         }
-                        
-                        if (!sqlsrv_execute($stmt_especial)) {
-                            error_log("Error ejecutando tarifa especial: " . print_r(sqlsrv_errors(), true));
-                        }
-                        
-                        if ($stmt_especial) sqlsrv_free_stmt($stmt_especial);
                     }
                 }
             }
         }
         
-        sqlsrv_free_stmt($stmt);
+        // Confirmar transacción
+        sqlsrv_commit($conn);
         
         echo json_encode([
             'success' => true, 
-            'message' => 'Registro creado exitosamente!',
-            'id' => $nuevo_id, // ID numérico para retrocompatibilidad
-            'guid' => $guid_tarifa, // GUID para registros especiales
+            'message' => 'Registro modificado exitosamente!',
+            'id' => $id,
             'modo_especial' => $modo_especial
         ]);
         exit;
         
     } catch(Exception $e) {
+        sqlsrv_rollback($conn);
         echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
         exit;
     }
@@ -269,22 +407,24 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CREAR NUEVO REGISTRO - SISTEMA DE COTIZACIÓN</title>
+  <title>MODIFICAR REGISTRO - SISTEMA DE COTIZACIÓN</title>
   
   <!-- Gentelella CSS -->
   <link href="vendors/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="vendors/font-awesome/css/font-awesome.min.css" rel="stylesheet">
   <link href="vendors/nprogress/nprogress.css" rel="stylesheet">
   <link href="vendors/select2/dist/css/select2.min.css" rel="stylesheet">
+  <link href="vendors/datatables.net-bs/css/dataTables.bootstrap.min.css" rel="stylesheet">
   <link href="build/css/custom.min.css" rel="stylesheet">
   
   <style>
+    /* ESTILOS SIMILARES A INDEX.PHP */
     .form-section {
         background: #f8f9fa;
         padding: 15px;
         border-radius: 5px;
         margin-bottom: 20px;
-        border-left: 4px solid #28a745;
+        border-left: 4px solid #3498db;
     }
     
     .section-title {
@@ -298,7 +438,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
     
     .section-title i {
         margin-right: 10px;
-        color: #28a745;
+        color: #3498db;
     }
     
     .form-label {
@@ -317,7 +457,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
     }
     
     .modal-confirm .modal-header {
-        background: linear-gradient(135deg, #009A3F, #00c853);
+        background: linear-gradient(135deg, #3498db, #2980b9);
         color: white;
         border-radius: 5px 5px 0 0;
     }
@@ -485,18 +625,205 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
     }
     
     /* ESTILO PARA EL MENÚ ACTIVO */
-    .menu-crear-registro {
+    .menu-modificar-registro {
         background: linear-gradient(135deg, #f39c12, #e67e22) !important;
-        border-left: 4px solid #ebefee !important;
+        border-left: 4px solid #fff !important;
     }
     
-    .menu-crear-registro a {
+    .menu-modificar-registro a {
         color: white !important;
         font-weight: 600 !important;
     }
     
-    .menu-crear-registro i {
+    .menu-modificar-registro i {
         color: white !important;
+    }
+    
+    /* BOTÓN MODIFICAR EN TABLA */
+    .btn-modificar {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        border: none;
+        color: white;
+        font-size: 12px;
+        padding: 5px 12px;
+        border-radius: 4px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .btn-modificar:hover {
+        background: linear-gradient(135deg, #2980b9, #21618c);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 5px rgba(52, 152, 219, 0.3);
+        color: white;
+    }
+    
+    .btn-modificar i {
+        margin-right: 5px;
+        font-size: 11px;
+    }
+    
+    /* Badge para modo especial */
+    .badge-mod-especial {
+        background: linear-gradient(135deg, #9b59b6, #8e44ad) !important;
+        color: white !important;
+        font-size: 10px !important;
+        padding: 2px 6px !important;
+        border-radius: 8px !important;
+        font-weight: 500;
+    }
+    
+    .badge-mod-normal {
+        background: linear-gradient(135deg, #2ecc71, #27ae60) !important;
+        color: white !important;
+        font-size: 10px !important;
+        padding: 2px 6px !important;
+        border-radius: 8px !important;
+        font-weight: 500;
+    }
+    
+    /* ESTILOS IGUALES A INDEX.PHP PARA FILTROS Y TABLA */
+    .filter-container {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 2px;
+        margin-bottom: 2px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .filter-container .form-label {
+        font-weight: 600;
+        color: #495057;
+        font-size: 13px;
+        margin-bottom: 1px;
+    }
+    
+    .filter-select {
+        width: 100%;
+        font-size: 13px;
+    }
+    
+    .select2-container--default .select2-selection--single {
+        border: 1px solid #ced4da;
+        height: 34px;
+        border-radius: 4px;
+    }
+    
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 34px;
+        font-size: 13px;
+    }
+    
+    /* BADGES IGUALES A INDEX.PHP */
+    .badge-service {
+        background: linear-gradient(135deg, #3498db, #2980b9) !important;
+        color: white !important;
+        font-size: 11px !important;
+        padding: 3px 8px !important;
+        border-radius: 10px !important;
+        font-weight: 500;
+    }
+    
+    .badge-year {
+        background: linear-gradient(135deg, #f39c12, #e67e22) !important;
+        color: white !important;
+        font-size: 11px !important;
+        padding: 3px 8px !important;
+        border-radius: 10px !important;
+        font-weight: 500;
+    }
+    
+    .badge-utd {
+        background: linear-gradient(135deg, #9b59b6, #8e44ad) !important;
+        color: white !important;
+        font-size: 11px !important;
+        padding: 3px 8px !important;
+        border-radius: 10px !important;
+        font-weight: 500;
+    }
+    
+    .badge-city {
+        background: linear-gradient(135deg, #1abc9c, #16a085) !important;
+        color: white !important;
+        font-size: 11px !important;
+        padding: 3px 8px !important;
+        border-radius: 10px !important;
+        font-weight: 500;
+    }
+    
+    .badge-warehouse {
+        background: linear-gradient(135deg, #e74c3c, #c0392b) !important;
+        color: white !important;
+        font-size: 11px !important;
+        padding: 3px 8px !important;
+        border-radius: 10px !important;
+        font-weight: 500;
+    }
+    
+    /* TABLA DATATABLES */
+    .dataTables_wrapper {
+        padding: 0 !important;
+    }
+    
+    .dataTables_wrapper .table {
+        margin-bottom: 0 !important;
+        font-size: 13px;
+    }
+    
+    .dataTables_wrapper .table thead th {
+        background: linear-gradient(135deg, #3498db, #2980b9) !important;
+        color: white !important;
+        font-weight: 600;
+        border: none !important;
+        padding: 12px 8px !important;
+        vertical-align: middle;
+        text-align: center;
+    }
+    
+    .dataTables_wrapper .table tbody td {
+        padding: 10px 8px !important;
+        vertical-align: middle;
+        border-color: #e9ecef !important;
+    }
+    
+    .dataTables_wrapper .table tbody tr:hover {
+        background-color: #f8f9fa !important;
+    }
+    
+    /* CONTADOR DE REGISTROS */
+    .records-count {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        color: white;
+        padding: 8px 15px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+    }
+    
+    .records-count i {
+        margin-right: 8px;
+        font-size: 12px;
+    }
+    
+    /* BOTÓN LIMPIAR FILTROS */
+    .btn-clear-filters {
+        background: #6c757d;
+        border: none;
+        color: white;
+        font-size: 13px;
+        padding: 8px 16px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+    }
+    
+    .btn-clear-filters:hover {
+        background: #5a6268;
+        color: white;
     }
   </style>
 </head>
@@ -536,8 +863,11 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                 <li>
                   <a href="index.php"><i class="fa fa-home"></i> Inicio</a>
                 </li>
-                <li class="active menu-crear-registro">
+                <li>
                   <a href="crear_registro.php"><i class="fa fa-plus-circle"></i> Crear Nuevo</a>
+                </li>
+                <li class="active menu-modificar-registro">
+                  <a href="modificar_registro.php"><i class="fa fa-edit"></i> Modificar Registro</a>
                 </li>
                 <li>
                   <a href="logout.php"><i class="fa fa-sign-out"></i> Cerrar Sesión</a>
@@ -570,7 +900,12 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
             <div class="nav toggle">
               <a id="menu_toggle"><i class="fa fa-bars"></i></a>
             </div>
-            
+            <div class="nav-title">
+              <i class="fa fa-edit"></i> MODIFICAR REGISTRO
+              <?php if ($registro_id > 0 && $registro): ?>
+                <span class="badge badge-warning ml-2" style="font-size: 12px;">Editando ID: <?= htmlspecialchars($registro_id) ?></span>
+              <?php endif; ?>
+            </div>
           </div>
           
           <nav class="nav navbar-nav">
@@ -598,29 +933,214 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
       <!-- CONTENIDO PRINCIPAL -->
       <div class="right_col" role="main">
         
+        <!-- SI NO HAY REGISTRO SELECCIONADO, MOSTRAR TABLA DE BÚSQUEDA -->
+        <?php if (!$registro): ?>
+        
+        <!-- PANEL DE FILTROS -->
+        <div class="row">
+          <div class="col-md-12 col-sm-12">
+            <div class="x_panel">
+              
+              <div class="x_content">
+                <div class="filter-container">
+                  <form id="filtrosForm" class="row">
+                    <div class="col-md-3 col-sm-6 mb-3">
+                      <label class="form-label">Servicio</label>
+                      <select name="servicio" class="form-control filter-select select2-filtro">
+                        <option value="">Todos los servicios</option>
+                        <?php foreach($servicios as $serv): ?>
+                          <option value="<?= htmlspecialchars($serv) ?>" <?= $filtro_servicio == $serv ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($serv) ?>
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
+                    </div>
+                    
+                    <div class="col-md-3 col-sm-6 mb-3">
+                      <label class="form-label">Gestión</label>
+                      <select name="gestion" class="form-control filter-select select2-filtro">
+                        <option value="">Todas las gestiones</option>
+                        <?php foreach($gestiones as $ges): ?>
+                          <option value="<?= htmlspecialchars($ges) ?>" <?= $filtro_gestion == $ges ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($ges) ?>
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
+                    </div>
+                    
+                    <div class="col-md-3 col-sm-6 mb-3">
+                      <label class="form-label">Almacén</label>
+                      <select name="almacen" class="form-control filter-select select2-filtro">
+                        <option value="">Todos los almacenes</option>
+                        <?php foreach($almacenes as $alm): ?>
+                          <option value="<?= htmlspecialchars($alm) ?>" <?= $filtro_almacen == $alm ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($alm) ?>
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
+                    </div>
+                    
+                    <div class="col-md-3 col-sm-6 mb-3">
+                      <label class="form-label">UTD</label>
+                      <select name="utd" class="form-control filter-select select2-filtro">
+                        <option value="">Todos los UTD</option>
+                        <?php foreach($utds as $valor_original => $porcentaje): ?>
+                          <option value="<?= htmlspecialchars($valor_original) ?>" <?= $filtro_utd == $valor_original ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($porcentaje) ?>
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
+                    </div>
+                    
+                    <div class="col-12">
+                      <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                          <a href="modificar_registro.php" class="btn btn-clear-filters">
+                            <i class="fa fa-times"></i> Limpiar Filtros
+                          </a>
+                        </div>
+                        <div class="records-count">
+                          <i class="fa fa-database"></i> 
+                          <span id="totalRecords"><?= count($registros) ?></span> registros
+                        </div>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL DE LA TABLA -->
         <div class="row">
           <div class="col-md-12 col-sm-12">
             <div class="x_panel">
               <div class="x_title">
-                <h2><i class="fa fa-edit"></i> Formulario de Nuevo Registro</h2>
+                <h2><i class="fa fa-table"></i> Seleccione el Registro a Modificar</h2>
+                <div class="clearfix"></div>
+              </div>
+              <div class="x_content">
+                <?php if(isset($error)): ?>
+                  <div class="alert alert-danger alert-dismissible fade in" role="alert">
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                      <span aria-hidden="true">×</span>
+                    </button>
+                    <i class="fa fa-exclamation-triangle"></i> <?= htmlspecialchars($error) ?>
+                  </div>
+                <?php endif; ?>
+                
+                <div class="table-responsive">
+                  <table id="datatable-modificar" class="table table-striped table-bordered" style="width:100%">
+                    <thead>
+                      <tr>
+                        <th width="5%">ID</th>
+                        <th width="15%">Servicio</th>
+                        <th width="12%">Ciudad</th>
+                        <th width="15%">Almacén</th>
+                        <th width="8%">Gestión</th>
+                        <th width="8%">UTD</th>
+                        <th width="10%">Modo</th>
+                        <th width="27%">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <?php if(!empty($registros)): ?>
+                        <?php foreach($registros as $registro_tabla): ?>
+                          <tr data-id="<?= $registro_tabla['id'] ?>">
+                            <td class="text-center"><?= htmlspecialchars($registro_tabla['id']) ?></td>
+                            <td>
+                              <span class="badge badge-service"><?= htmlspecialchars($registro_tabla['servicio'] ?? 'N/A') ?></span>
+                            </td>
+                            <td>
+                              <span class="badge badge-city"><?= htmlspecialchars($registro_tabla[' ciudad'] ?? '') ?></span>
+                            </td>
+                            <td>
+                              <span class="badge badge-warehouse"><?= htmlspecialchars($registro_tabla[' almacen'] ?? '') ?></span>
+                            </td>
+                            <td class="text-center">
+                              <span class="badge badge-year"><?= htmlspecialchars($registro_tabla[' gestion'] ?? '') ?></span>
+                            </td>
+                            <td class="text-center">
+                              <?php if(!empty($registro_tabla[' utd'])): ?>
+                                <span class="badge badge-utd" title="Valor original: <?= htmlspecialchars($registro_tabla[' utd']) ?>">
+                                  <?= convertirAPorcentaje($registro_tabla[' utd']) ?>
+                                </span>
+                              <?php else: ?>
+                                <span class="badge bg-secondary">N/A</span>
+                              <?php endif; ?>
+                            </td>
+                            <td class="text-center">
+                              <?php if(isset($registro_tabla['modo_especial']) && $registro_tabla['modo_especial'] == 1): ?>
+                                <span class="badge-mod-especial">Especial</span>
+                              <?php else: ?>
+                                <span class="badge-mod-normal">Normal</span>
+                              <?php endif; ?>
+                            </td>
+                            <td class="text-center">
+                              <a href="modificar_registro.php?id=<?= htmlspecialchars($registro_tabla['id']) ?>" class="btn btn-modificar">
+                                <i class="fa fa-edit"></i> Modificar
+                              </a>
+                              <a href="index.php" class="btn btn-reporte" style="margin-left: 5px;">
+                                <i class="fa fa-eye"></i> Ver
+                              </a>
+                            </td>
+                          </tr>
+                        <?php endforeach; ?>
+                      <?php else: ?>
+                        <tr>
+                          <td colspan="8" class="text-center">No se encontraron registros</td>
+                        </tr>
+                      <?php endif; ?>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <?php else: ?>
+        <!-- SI HAY REGISTRO SELECCIONADO, MOSTRAR FORMULARIO DE MODIFICACIÓN -->
+        
+        <?php if ($registro_id > 0 && !$registro): ?>
+        <div class="row">
+          <div class="col-md-12 col-sm-12">
+            <div class="alert alert-danger">
+              <i class="fa fa-exclamation-triangle"></i> No se encontró el registro con ID: <?= htmlspecialchars($registro_id) ?>
+              <a href="modificar_registro.php" class="btn btn-sm btn-outline-danger ml-3">Volver a lista</a>
+            </div>
+          </div>
+        </div>
+        <?php endif; ?>
+        
+        <!-- FORMULARIO DE MODIFICACIÓN -->
+        <?php if ($registro): ?>
+        <div class="row">
+          <div class="col-md-12 col-sm-12">
+            <div class="x_panel">
+              <div class="x_title">
+                <h2><i class="fa fa-edit"></i> Modificar Registro #<?= htmlspecialchars($registro_id) ?></h2>
                 <div class="clearfix"></div>
               </div>
               
               <div class="x_content compact-form">
-                <form id="formCrearRegistro">
+                <form id="formModificarRegistro">
+                  <input type="hidden" name="id_registro" value="<?= htmlspecialchars($registro_id) ?>">
+                  <input type="hidden" name="guid_actual" value="<?= htmlspecialchars($registro['ID_Tarifas'] ?? '') ?>">
                   
                   <!-- SWITCH MODO TARIFA -->
                   <div class="switch-container">
                     <span class="switch-label">Modo de Tarifa:</span>
                     <label class="switch">
-                      <input type="checkbox" id="switchModoEspecial">
+                      <input type="checkbox" id="switchModoEspecial" <?= $modo_actual == 'especial' ? 'checked' : '' ?>>
                       <span class="slider"></span>
                     </label>
                     <span class="mode-label">
-                      <span id="modoTextoNormal" class="mode-normal">Normal</span>
-                      <span id="modoTextoEspecial" class="mode-especial" style="display: none;">Especial</span>
+                      <span id="modoTextoNormal" class="mode-normal" <?= $modo_actual == 'especial' ? 'style="display:none;"' : '' ?>>Normal</span>
+                      <span id="modoTextoEspecial" class="mode-especial" <?= $modo_actual == 'normal' ? 'style="display:none;"' : '' ?>>Especial</span>
                     </span>
-                    <input type="hidden" name="modo_especial" id="inputModoEspecial" value="0">
+                    <input type="hidden" name="modo_especial" id="inputModoEspecial" value="<?= $modo_actual == 'especial' ? '1' : '0' ?>">
                   </div>
                   
                   <!-- INFORMACIÓN GENERAL -->
@@ -635,7 +1155,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                         <select name="servicio" class="form-control select2-field" id="selectServicio">
                           <option value="">Seleccionar...</option>
                           <?php foreach($servicios as $serv): ?>
-                            <option value="<?= htmlspecialchars($serv) ?>"><?= htmlspecialchars($serv) ?></option>
+                            <option value="<?= htmlspecialchars($serv) ?>" <?= isset($registro['servicio']) && $registro['servicio'] == $serv ? 'selected' : '' ?>>
+                              <?= htmlspecialchars($serv) ?>
+                            </option>
                           <?php endforeach; ?>
                           <option value="NUEVO">[+ Crear nuevo servicio]</option>
                         </select>
@@ -649,7 +1171,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                         <select name="ciudad" class="form-control select2-field" id="selectCiudad">
                           <option value="">Seleccionar...</option>
                           <?php foreach($ciudades as $ciudad): ?>
-                            <option value="<?= htmlspecialchars($ciudad) ?>"><?= htmlspecialchars($ciudad) ?></option>
+                            <option value="<?= htmlspecialchars($ciudad) ?>" <?= isset($registro[' ciudad']) && $registro[' ciudad'] == $ciudad ? 'selected' : '' ?>>
+                              <?= htmlspecialchars($ciudad) ?>
+                            </option>
                           <?php endforeach; ?>
                           <option value="NUEVA">[+ Crear nueva ciudad]</option>
                         </select>
@@ -663,7 +1187,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                         <select name="almacen" class="form-control select2-field" id="selectAlmacen">
                           <option value="">Seleccionar...</option>
                           <?php foreach($almacenes as $alm): ?>
-                            <option value="<?= htmlspecialchars($alm) ?>"><?= htmlspecialchars($alm) ?></option>
+                            <option value="<?= htmlspecialchars($alm) ?>" <?= isset($registro[' almacen']) && $registro[' almacen'] == $alm ? 'selected' : '' ?>>
+                              <?= htmlspecialchars($alm) ?>
+                            </option>
                           <?php endforeach; ?>
                           <option value="NUEVO">[+ Crear nuevo almacén]</option>
                         </select>
@@ -675,17 +1201,23 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                       <div class="col-md-3 col-sm-6 mb-3">
                         <label class="form-label">Gestión</label>
                         <select name="gestion" class="form-control select2-field">
-                          <option value="<?= date('Y') ?>"><?= date('Y') ?> (Actual)</option>
                           <?php foreach($gestiones as $ges): ?>
-                            <option value="<?= htmlspecialchars($ges) ?>"><?= htmlspecialchars($ges) ?></option>
+                            <option value="<?= htmlspecialchars($ges) ?>" <?= isset($registro[' gestion']) && $registro[' gestion'] == $ges ? 'selected' : '' ?>>
+                              <?= htmlspecialchars($ges) ?>
+                            </option>
                           <?php endforeach; ?>
+                          <option value="<?= date('Y') ?>" <?= !isset($registro[' gestion']) ? 'selected' : '' ?>>
+                            <?= date('Y') ?> (Actual)
+                          </option>
                         </select>
                       </div>
                       
                       <div class="col-md-3 col-sm-6 mb-3">
                         <label class="form-label">UTD (%)</label>
                         <div class="input-group">
-                          <input type="text" name="utd" class="form-control" placeholder="0.15" value="0.15">
+                          <input type="text" name="utd" class="form-control" 
+                                 placeholder="0.15" 
+                                 value="<?= htmlspecialchars($registro[' utd'] ?? '0.15') ?>">
                           <div class="input-group-append">
                             <span class="input-group-text">%</span>
                           </div>
@@ -695,8 +1227,8 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                     </div>
                   </div>
                   
-                  <!-- TARIFAS NORMALES (VISIBLE POR DEFECTO) -->
-                  <div class="form-section" id="seccionTarifasNormales">
+                  <!-- TARIFAS NORMALES -->
+                  <div class="form-section" id="seccionTarifasNormales" style="<?= $modo_actual == 'especial' ? 'display:none;' : '' ?>">
                     <div class="section-title">
                       <i class="fa fa-dollar-sign"></i> Tarifas Normales (USD)
                     </div>
@@ -712,7 +1244,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="descarga_pall" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="descarga_pall" class="form-control tarifa-normal" 
+                                     placeholder="0,00" 
+                                     value="<?= htmlspecialchars($registro[' descarga_pall'] ?? '0,00') ?>">
                             </div>
                           </div>
                           
@@ -722,7 +1256,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="estibaje_cajas" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="estibaje_cajas" class="form-control tarifa-normal" 
+                                     placeholder="0,00" 
+                                     value="<?= htmlspecialchars($registro[' estibaje_cajas'] ?? '0,00') ?>">
                             </div>
                           </div>
                           
@@ -732,7 +1268,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="pall_in" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="pall_in" class="form-control tarifa-normal" 
+                                     placeholder="0,00" 
+                                     value="<?= htmlspecialchars($registro[' pall_in'] ?? '0,00') ?>">
                             </div>
                           </div>
                           
@@ -742,7 +1280,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="operacion_cajas_recepcion" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="operacion_cajas_recepcion" class="form-control tarifa-normal" 
+                                     placeholder="0,00" 
+                                     value="<?= htmlspecialchars($registro[' operacion_cajas_recepcion'] ?? '0,00') ?>">
                             </div>
                           </div>
                           
@@ -752,7 +1292,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="operacion_und_recepcion" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="operacion_und_recepcion" class="form-control tarifa-normal" 
+                                     placeholder="0,00" 
+                                     value="<?= htmlspecialchars($registro[' operacion_und_recepcion'] ?? '0,00') ?>">
                             </div>
                           </div>
                         </div>
@@ -766,7 +1308,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="m2_almacen" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="m2_almacen" class="form-control tarifa-normal" 
+                                     placeholder="0,00" 
+                                     value="<?= htmlspecialchars($registro[' m2_almacen'] ?? '0,00') ?>">
                             </div>
                           </div>
                           
@@ -776,7 +1320,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="almacen_pos" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="almacen_pos" class="form-control tarifa-normal" 
+                                     placeholder="0,00" 
+                                     value="<?= htmlspecialchars($registro[' almacen_pos'] ?? '0,00') ?>">
                             </div>
                           </div>
                         </div>
@@ -792,7 +1338,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="pall_out" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="pall_out" class="form-control tarifa-normal" 
+                                     placeholder="0,00" 
+                                     value="<?= htmlspecialchars($registro[' pall_out'] ?? '0,00') ?>">
                             </div>
                           </div>
                           
@@ -802,7 +1350,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="operacion_cajas_despacho" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="operacion_cajas_despacho" class="form-control tarifa-normal" 
+                                     placeholder="0,00" 
+                                     value="<?= htmlspecialchars($registro[' operacion_cajas_despacho'] ?? '0,00') ?>">
                             </div>
                           </div>
                           
@@ -812,7 +1362,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="operacion_und_despacho" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="operacion_und_despacho" class="form-control tarifa-normal" 
+                                     placeholder="0,00" 
+                                     value="<?= htmlspecialchars($registro[' operacion_und_despacho'] ?? '0,00') ?>">
                             </div>
                           </div>
                           
@@ -822,7 +1374,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="carga_pall" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="carga_pall" class="form-control tarifa-normal" 
+                                     placeholder="0,00" 
+                                     value="<?= htmlspecialchars($registro[' carga_pall'] ?? '0,00') ?>">
                             </div>
                           </div>
                         </div>
@@ -835,8 +1389,8 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                     </div>
                   </div>
                   
-                  <!-- TARIFAS ESPECIALES (OCULTO POR DEFECTO) -->
-                  <div class="form-section" id="seccionTarifasEspeciales" style="display: none;">
+                  <!-- TARIFAS ESPECIALES -->
+                  <div class="form-section" id="seccionTarifasEspeciales" style="<?= $modo_actual == 'normal' ? 'display:none;' : '' ?>">
                     <div class="section-title">
                       <i class="fa fa-star"></i> Tarifas Especiales
                     </div>
@@ -845,15 +1399,55 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                       <div class="col-12">
                         <div class="alert alert-info mb-3">
                           <i class="fa fa-info-circle"></i> 
-                          <strong>Instrucciones:</strong> Agregue servicios especiales con sus respectivos costos y frecuencias.
-                          Puede agregar tantos como necesite.
+                          <strong>Instrucciones:</strong> Modifique los servicios especiales según sea necesario.
+                          Puede agregar, eliminar o modificar tarifas.
                         </div>
                       </div>
                     </div>
                     
                     <!-- Contenedor para tarifas especiales dinámicas -->
                     <div id="contenedorTarifasEspeciales">
-                      <!-- Las tarifas especiales se agregarán aquí dinámicamente -->
+                      <?php if ($modo_actual == 'especial' && !empty($tarifas_especiales)): ?>
+                        <?php foreach($tarifas_especiales as $index => $tarifa): ?>
+                          <div class="tarifa-especial-item" id="tarifaEspecial<?= $index + 1 ?>">
+                            <div class="tarifa-especial-header">
+                              <h6 style="margin: 0; color: #007bff;">Tarifa Especial #<?= $index + 1 ?></h6>
+                              <button type="button" class="btn-eliminar-tarifa" onclick="eliminarTarifaEspecial(<?= $index + 1 ?>)">
+                                <i class="fa fa-times"></i> Eliminar
+                              </button>
+                            </div>
+                            <div class="row">
+                              <div class="col-md-5 mb-2">
+                                <label class="form-label">Servicio Especial *</label>
+                                <input type="text" class="form-control servicio-especial" 
+                                       placeholder="Ej: Palletizado, Enbalsamado, Etiquetado" 
+                                       value="<?= htmlspecialchars($tarifa['Servicio'] ?? '') ?>"
+                                       data-index="<?= $index + 1 ?>">
+                              </div>
+                              <div class="col-md-3 mb-2">
+                                <label class="form-label">Costo (USD) *</label>
+                                <div class="input-group">
+                                  <div class="input-group-prepend">
+                                    <span class="input-group-text">$</span>
+                                  </div>
+                                  <input type="text" class="form-control costo-especial" 
+                                         placeholder="0,00" 
+                                         value="<?= htmlspecialchars($tarifa['costo'] ?? '0,00') ?>"
+                                         data-index="<?= $index + 1 ?>">
+                                </div>
+                              </div>
+                              <div class="col-md-4 mb-2">
+                                <label class="form-label">Frecuencia *</label>
+                                <select class="form-control frecuencia-especial" data-index="<?= $index + 1 ?>">
+                                  <option value="Mensualizado" <?= isset($tarifa['Frecuencia']) && $tarifa['Frecuencia'] == 'Mensualizado' ? 'selected' : '' ?>>Mensualizado</option>
+                                  <option value="Anual" <?= isset($tarifa['Frecuencia']) && $tarifa['Frecuencia'] == 'Anual' ? 'selected' : '' ?>>Anual</option>
+                                  <option value="Dia" <?= isset($tarifa['Frecuencia']) && $tarifa['Frecuencia'] == 'Dia' ? 'selected' : '' ?>>Día</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        <?php endforeach; ?>
+                      <?php endif; ?>
                     </div>
                     
                     <!-- Botón para agregar nueva tarifa especial -->
@@ -866,11 +1460,11 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                   
                   <!-- BOTONES -->
                   <div class="text-center mt-4">
-                    <button type="button" id="btnGuardar" class="btn btn-success">
-                      <i class="fa fa-save"></i> Guardar Registro
+                    <button type="button" id="btnGuardarModificacion" class="btn btn-warning">
+                      <i class="fa fa-save"></i> Guardar Cambios
                     </button>
-                    <a href="index.php" class="btn btn-secondary" style="margin-left: 10px;">
-                      <i class="fa fa-times"></i> Cancelar
+                    <a href="modificar_registro.php" class="btn btn-secondary" style="margin-left: 10px;">
+                      <i class="fa fa-times"></i> Volver a lista
                     </a>
                   </div>
                   
@@ -879,6 +1473,9 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
             </div>
           </div>
         </div>
+        <?php endif; ?>
+        
+        <?php endif; ?>
 
       </div>
 
@@ -895,22 +1492,22 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
   <div class="modal fade" id="confirmModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-lg" role="document">
       <div class="modal-content">
-        <div class="modal-header" style="background: linear-gradient(135deg, #009A3F, #00c853); color: white;">
-          <h5 class="modal-title"><i class="fa fa-check-circle"></i> Confirmar Registro</h5>
+        <div class="modal-header" style="background: linear-gradient(135deg, #3498db, #2980b9); color: white;">
+          <h5 class="modal-title"><i class="fa fa-check-circle"></i> Confirmar Modificación</h5>
           <button type="button" class="close" data-dismiss="modal" style="color: white;">
             <span>&times;</span>
           </button>
         </div>
         <div class="modal-body">
-          <p>Revise los datos antes de guardar:</p>
+          <p>Revise los cambios antes de guardar:</p>
           
           <div class="data-preview" id="dataPreview">
             <!-- Datos se cargarán aquí -->
           </div>
           
           <div class="text-center mt-3">
-            <button type="button" class="btn btn-success" id="btnConfirmarGuardar">
-              <i class="fa fa-check"></i> Sí, Guardar Registro
+            <button type="button" class="btn btn-warning" id="btnConfirmarModificacion">
+              <i class="fa fa-check"></i> Sí, Guardar Cambios
             </button>
             <button type="button" class="btn btn-secondary" data-dismiss="modal" style="margin-left: 10px;">
               <i class="fa fa-times"></i> Cancelar
@@ -926,19 +1523,78 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
   <script src="vendors/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
   <script src="vendors/nprogress/nprogress.js"></script>
   <script src="vendors/select2/dist/js/select2.min.js"></script>
+  <script src="vendors/datatables.net/js/jquery.dataTables.min.js"></script>
+  <script src="vendors/datatables.net-bs/js/dataTables.bootstrap.min.js"></script>
   <script src="build/js/custom.min.js"></script>
 
   <script>
   $(document).ready(function() {
     
     // Inicializar Select2
-    $('.select2-field').select2({
+    $('.select2-filtro, .select2-field').select2({
       placeholder: "Seleccionar...",
       width: '100%'
     });
     
+    // Inicializar DataTable en la tabla de búsqueda
+    <?php if (!$registro): ?>
+    var table = $('#datatable-modificar').DataTable({
+      language: {
+        "sProcessing": "Procesando...",
+        "sLengthMenu": "Mostrar _MENU_ registros",
+        "sZeroRecords": "No se encontraron resultados",
+        "sEmptyTable": "Ningún dato disponible en esta tabla",
+        "sInfo": "Mostrando registros del _START_ al _END_ de un total de _TOTAL_ registros",
+        "sInfoEmpty": "Mostrando registros del 0 al 0 de un total de 0 registros",
+        "sInfoFiltered": "(filtrado de un total de _MAX_ registros)",
+        "sSearch": "Buscar:",
+        "sLoadingRecords": "Cargando...",
+        "oPaginate": {
+          "sFirst": "Primero",
+          "sLast": "Último",
+          "sNext": "Siguiente",
+          "sPrevious": "Anterior"
+        }
+      },
+      pageLength: 10,
+      order: [[0, 'desc']],
+      responsive: true,
+      dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+           '<"row"<"col-sm-12"tr>>' +
+           '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+      columnDefs: [
+        { orderable: false, targets: 7 } // Columna de acciones no ordenable
+      ]
+    });
+    
+    // Actualizar contador de registros
+    function updateRecordsCount() {
+      var count = table.rows().count();
+      $('#totalRecords').text(count);
+    }
+    
+    updateRecordsCount();
+    
+    // Filtros automáticos
+    $('.select2-filtro').on('change', function() {
+      const formData = $('#filtrosForm').serialize();
+      const urlParams = new URLSearchParams(formData);
+      
+      let newUrl = window.location.pathname;
+      if (formData) {
+        newUrl += '?' + urlParams.toString();
+      }
+      
+      window.history.replaceState({}, '', newUrl);
+      window.location.reload();
+    });
+    <?php endif; ?>
+    
+    // FUNCIONALIDADES DEL FORMULARIO DE MODIFICACIÓN
+    <?php if ($registro): ?>
+    
     // Contador para tarifas especiales
-    let contadorTarifasEspeciales = 0;
+    let contadorTarifasEspeciales = <?= $modo_actual == 'especial' ? count($tarifas_especiales) : 0 ?>;
     
     // Función para agregar tarifa especial
     function agregarTarifaEspecial() {
@@ -1026,19 +1682,16 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
       const isEspecial = $(this).is(':checked');
       
       if (isEspecial) {
-        // Cambiar a modo especial
         $('#seccionTarifasNormales').hide();
         $('#seccionTarifasEspeciales').show();
         $('#modoTextoNormal').hide();
         $('#modoTextoEspecial').show();
         $('#inputModoEspecial').val('1');
         
-        // Agregar primera tarifa especial si no hay ninguna
         if ($('#contenedorTarifasEspeciales').children().length === 0) {
           agregarTarifaEspecial();
         }
       } else {
-        // Cambiar a modo normal
         $('#seccionTarifasNormales').show();
         $('#seccionTarifasEspeciales').hide();
         $('#modoTextoNormal').show();
@@ -1082,8 +1735,8 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
       return tarifas;
     }
     
-    // Botón Guardar
-    $('#btnGuardar').on('click', function(e) {
+    // Botón Guardar Modificación
+    $('#btnGuardarModificacion').on('click', function(e) {
       e.preventDefault();
       
       // Obtener valores
@@ -1119,7 +1772,6 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
           return;
         }
         
-        // Validar que todos los servicios especiales tengan nombre
         for (let tarifa of tarifasEspeciales) {
           if (!tarifa.servicio.trim()) {
             alert('Todos los servicios especiales deben tener un nombre');
@@ -1139,6 +1791,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
       
       // Preparar datos para mostrar
       let datos = {
+        id: $('input[name="id_registro"]').val(),
         servicio: servicioFinal,
         ciudad: ciudadFinal,
         almacen: almacenFinal,
@@ -1149,7 +1802,6 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
       
       // Agregar datos según el modo
       if (!modoEspecial) {
-        // Datos de tarifas normales
         datos.descarga_pall = $('input[name="descarga_pall"]').val();
         datos.estibaje_cajas = $('input[name="estibaje_cajas"]').val();
         datos.pall_in = $('input[name="pall_in"]').val();
@@ -1162,12 +1814,15 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
         datos.operacion_und_despacho = $('input[name="operacion_und_despacho"]').val();
         datos.carga_pall = $('input[name="carga_pall"]').val();
       } else {
-        // Datos de tarifas especiales
         datos.tarifas_especiales = obtenerTarifasEspeciales();
       }
       
       // Mostrar datos en popup
       let html = `
+        <div class="data-row">
+          <div class="data-label">ID:</div>
+          <div class="data-value"><strong>${datos.id}</strong></div>
+        </div>
         <div class="data-row">
           <div class="data-label">Servicio:</div>
           <div class="data-value">${datos.servicio}</div>
@@ -1205,10 +1860,6 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
             <div class="data-label">Estibaje Cajas/Bultos:</div>
             <div class="data-value">$${datos.estibaje_cajas}</div>
           </div>
-          <div class="data-row">
-            <div class="data-label">IN Pallet:</div>
-            <div class="data-value">$${datos.pall_in}</div>
-          </div>
         `;
       } else {
         html += `
@@ -1229,50 +1880,50 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
       $('#confirmModal').modal('show');
       
       // Guardar datos para usar después
-      window.datosParaGuardar = datos;
-      window.modoEspecialParaGuardar = modoEspecial;
+      window.datosParaModificar = datos;
+      window.modoEspecialParaModificar = modoEspecial;
     });
     
-    // Confirmar guardado
-    $('#btnConfirmarGuardar').on('click', function() {
+    // Confirmar modificación
+    $('#btnConfirmarModificacion').on('click', function() {
       let $btn = $(this);
       $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Guardando...');
       
       // Preparar datos para enviar
       let datosEnvio = {
-        confirmar_guardado: 'true',
-        servicio_final: window.datosParaGuardar.servicio,
-        ciudad_final: window.datosParaGuardar.ciudad,
-        almacen_final: window.datosParaGuardar.almacen,
-        gestion_final: window.datosParaGuardar.gestion,
-        utd_final: window.datosParaGuardar.utd,
-        modo_especial: window.modoEspecialParaGuardar ? '1' : '0'
+        confirmar_modificacion: 'true',
+        id_registro: window.datosParaModificar.id,
+        servicio_final: window.datosParaModificar.servicio,
+        ciudad_final: window.datosParaModificar.ciudad,
+        almacen_final: window.datosParaModificar.almacen,
+        gestion_final: window.datosParaModificar.gestion,
+        utd_final: window.datosParaModificar.utd,
+        modo_especial: window.modoEspecialParaModificar ? '1' : '0',
+        guid_actual: $('input[name="guid_actual"]').val()
       };
       
       // Agregar datos según el modo
-      if (!window.modoEspecialParaGuardar) {
-        // Datos normales
-        datosEnvio.descarga_pall = window.datosParaGuardar.descarga_pall;
-        datosEnvio.estibaje_cajas = window.datosParaGuardar.estibaje_cajas;
-        datosEnvio.pall_in = window.datosParaGuardar.pall_in;
-        datosEnvio.operacion_cajas_recepcion = window.datosParaGuardar.operacion_cajas_recepcion;
-        datosEnvio.operacion_und_recepcion = window.datosParaGuardar.operacion_und_recepcion;
-        datosEnvio.m2_almacen = window.datosParaGuardar.m2_almacen;
-        datosEnvio.almacen_pos = window.datosParaGuardar.almacen_pos;
-        datosEnvio.pall_out = window.datosParaGuardar.pall_out;
-        datosEnvio.operacion_cajas_despacho = window.datosParaGuardar.operacion_cajas_despacho;
-        datosEnvio.operacion_und_despacho = window.datosParaGuardar.operacion_und_despacho;
-        datosEnvio.carga_pall = window.datosParaGuardar.carga_pall;
+      if (!window.modoEspecialParaModificar) {
+        datosEnvio.descarga_pall = window.datosParaModificar.descarga_pall;
+        datosEnvio.estibaje_cajas = window.datosParaModificar.estibaje_cajas;
+        datosEnvio.pall_in = window.datosParaModificar.pall_in;
+        datosEnvio.operacion_cajas_recepcion = window.datosParaModificar.operacion_cajas_recepcion;
+        datosEnvio.operacion_und_recepcion = window.datosParaModificar.operacion_und_recepcion;
+        datosEnvio.m2_almacen = window.datosParaModificar.m2_almacen;
+        datosEnvio.almacen_pos = window.datosParaModificar.almacen_pos;
+        datosEnvio.pall_out = window.datosParaModificar.pall_out;
+        datosEnvio.operacion_cajas_despacho = window.datosParaModificar.operacion_cajas_despacho;
+        datosEnvio.operacion_und_despacho = window.datosParaModificar.operacion_und_despacho;
+        datosEnvio.carga_pall = window.datosParaModificar.carga_pall;
       } else {
-        // Datos especiales - ¡IMPORTANTE: Enviar como JSON string!
-        if (window.datosParaGuardar.tarifas_especiales) {
-          datosEnvio.tarifas_especiales = JSON.stringify(window.datosParaGuardar.tarifas_especiales);
+        if (window.datosParaModificar.tarifas_especiales) {
+          datosEnvio.tarifas_especiales = JSON.stringify(window.datosParaModificar.tarifas_especiales);
         }
       }
       
       // Enviar datos por AJAX
       $.ajax({
-        url: 'crear_registro.php',
+        url: 'modificar_registro.php',
         method: 'POST',
         data: datosEnvio,
         dataType: 'json',
@@ -1280,33 +1931,25 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
           if (response.success) {
             $('#confirmModal').modal('hide');
             let mensaje = `✅ ${response.message}`;
-            if (response.id) {
-              mensaje += `\nID del nuevo registro: ${response.id}`;
-              
-              if (window.modoEspecialParaGuardar && response.guid) {
-                mensaje += `\nGUID del registro especial: ${response.guid}`;
-              }
-              
-              if (confirm(mensaje + '\n\n¿Desea ver el registro creado?')) {
-                window.location.href = `index.php`;
-              } else {
-                window.location.href = 'index.php';
-              }
+            
+            if (confirm(mensaje + '\n\n¿Desea ver el registro modificado?')) {
+              window.location.href = `index.php`;
             } else {
-              alert(mensaje);
-              window.location.href = 'index.php';
+              window.location.href = 'modificar_registro.php';
             }
           } else {
             alert('❌ ' + response.message);
-            $btn.prop('disabled', false).html('<i class="fa fa-check"></i> Sí, Guardar Registro');
+            $btn.prop('disabled', false).html('<i class="fa fa-check"></i> Sí, Guardar Cambios');
           }
         },
         error: function(xhr, status, error) {
           alert('❌ Error al conectar con el servidor: ' + error);
-          $btn.prop('disabled', false).html('<i class="fa fa-check"></i> Sí, Guardar Registro');
+          $btn.prop('disabled', false).html('<i class="fa fa-check"></i> Sí, Guardar Cambios');
         }
       });
     });
+    
+    <?php endif; ?>
     
   });
   </script>

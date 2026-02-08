@@ -9,7 +9,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_name'])) {
 }
 // ===== FIN VERIFICACIÓN =====
 
-// ===== Validar si usuario puede crear opciones basado en id_perfil =====
+// ===== Validar si usuario puede crear/modificar opciones basado en id_perfil =====
 $puede_crear_opciones = false;
 if (isset($_SESSION['id_perfil'])) {
     if ($_SESSION['id_perfil'] == 2) {
@@ -495,20 +495,37 @@ try {
     /* NUEVO ESTILO PARA LA OPCIÓN CREAR REGISTRO (solo para id_perfil = 2) */
     .menu-crear-registro {
         background: linear-gradient(135deg, #009A3F, #009A3F);
-  
     }
     
     .menu-crear-registro a {
-        color: white ;
-        font-weight: 600 ;
+        color: white !important;
+        font-weight: 600 !important;
     }
     
     .menu-crear-registro i {
-        color: white ;
+        color: white !important;
     }
     
     .menu-crear-registro:hover {
-        background: linear-gradient(135deg, #f39c12, #e67e22) ;
+        background: linear-gradient(135deg, #f39c12, #e67e22) !important;
+    }
+    
+    /* NUEVO ESTILO PARA LA OPCIÓN MODIFICAR REGISTRO (solo para id_perfil = 2) */
+    .menu-modificar-registro {
+        background: linear-gradient(135deg, #009A3F, #009A3F) !important;
+    }
+    
+    .menu-modificar-registro a {
+        color: white !important;
+        font-weight: 600 !important;
+    }
+    
+    .menu-modificar-registro i {
+        color: white !important;
+    }
+    
+    .menu-modificar-registro:hover {
+        background: linear-gradient(135deg, #f39c12, #e67e22) !important;
     }
     
     /* AVATAR DEL USUARIO CON SU COLOR */
@@ -597,6 +614,14 @@ try {
                 <li class="menu-crear-registro">
                   <a href="crear_registro.php">
                     <i class="fa fa-plus-circle"></i> Crear Registro
+                    <span class="fa fa-chevron-right" style="float: right;"></span>
+                  </a>
+                </li>
+                
+                <!-- ===== NUEVA OPCIÓN: MODIFICAR REGISTRO (Solo para usuarios con id_perfil = 2) ===== -->
+                <li class="menu-modificar-registro">
+                  <a href="modificar_registro.php">
+                    <i class="fa fa-edit"></i> Modificar Registro
                     <span class="fa fa-chevron-right" style="float: right;"></span>
                   </a>
                 </li>
