@@ -243,7 +243,8 @@ function generarExcelTarifasEspeciales($registro, $tarifas_especiales, $cliente_
             $sheet1->setCellValue('G' . $row, $valor);
             $sheet1->getStyle('G' . $row)
                 ->getNumberFormat()
-                ->setFormatCode(NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1);
+                // Reemplazar en ambas funciones:
+                ->setFormatCode('#,##0.000');  // 3 decimales
             
             // Bordes para toda la fila
             foreach (range('A', 'G') as $col) {
@@ -1334,7 +1335,8 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
         $sheet1->setCellValue('G' . $row, $valor);
         $sheet1->getStyle('G' . $row)
             ->getNumberFormat()
-            ->setFormatCode(NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED2);
+            // Reemplazar en ambas funciones:
+            ->setFormatCode('#,##0.000');  // 3 decimales
         
         // Bordes para toda la fila
         foreach (range('A', 'G') as $col) {
@@ -1559,7 +1561,7 @@ function generarExcelCompleto($registro, $procesos, $cliente_info) {
     $sheet2->mergeCells('A' . $row . ':C' . $row);
     $sheet2->setCellValue('A' . $row, '3. DATOS DEL PROCESO ALMACENAJE');
     $sheet2->getStyle('A' . $row)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
-    $sheet2->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLid)->getStartColor()->setARGB('FF009A3F');
+    $sheet2->getStyle('A' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF009A3F');
     $sheet2->getStyle('A' . $row)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
     $row++;
     
