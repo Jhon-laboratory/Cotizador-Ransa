@@ -83,14 +83,23 @@ try {
 function convertirAPorcentaje($valor) {
     if ($valor === null || $valor === '') return '';
     
+    // Limpiar el valor
     $valor_limpio = str_replace(',', '.', trim($valor));
     $float_valor = floatval($valor_limpio);
     $porcentaje = $float_valor * 100;
     
-    if ($porcentaje == intval($porcentaje)) {
-        return intval($porcentaje) . '%';
+    // Redondear para evitar problemas de precisión
+    $porcentaje_redondeado = round($porcentaje, 2);
+    
+    // Verificar si es un entero (con tolerancia)
+    if (abs($porcentaje_redondeado - intval($porcentaje_redondeado)) < 0.0001) {
+        return intval($porcentaje_redondeado) . '%';
     } else {
-        return number_format($porcentaje, 2, ',', '') . '%';
+        // Mostrar máximo 2 decimales, pero eliminar .00 si existe
+        $formateado = number_format($porcentaje_redondeado, 2, ',', '');
+        $formateado = rtrim($formateado, '0');
+        $formateado = rtrim($formateado, ',');
+        return $formateado . '%';
     }
 }
 
@@ -771,9 +780,22 @@ try {
           <div class="col-md-12 col-sm-12">
             <div class="x_panel">
               <div class="x_title">
-                <h2><i class="fa fa-table"></i> Registros de Tarifas</h2>
-                <div class="clearfix"></div>
-              </div>
+    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+        <!-- TÍTULO IZQUIERDA -->
+        <h2 style="display: flex; align-items: center; margin: 0; gap: 8px;">
+            <i class="fa fa-table" style="color: #009A3F;"></i> 
+            <span style="font-weight: 600; color: #2c3e50;">Registros de Tarifas</span>
+        </h2>
+        
+        <!-- BADGE RECOMENDACIÓN DERECHA -->
+        <div style="display: flex; align-items: center; background: #e0ffe0; padding: 5px 15px; border-radius: 30px; border-left: 4px solid #00ff3c;">
+            <i class="fa fa-info-circle" style="color: #ff000098; margin-right: 8px; font-size: 14px;"></i>
+            <span style="font-weight: 600; color: #000000; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Utilidad Recomendada por el Corporativo:</span>
+            <span style="font-weight: 800; color: white; background: #f58325; padding: 3px 12px; border-radius: 20px; margin-left: 10px; font-size: 13px; box-shadow: 0 2px 5px rgba(229,57,53,0.3);">14%</span>
+        </div>
+    </div>
+    <div class="clearfix"></div>
+</div>
               <div class="x_content">
                 <?php if(isset($error)): ?>
                   <div class="alert alert-danger alert-dismissible fade in" role="alert">

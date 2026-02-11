@@ -72,14 +72,23 @@ try {
 function convertirAPorcentaje($valor) {
     if ($valor === null || $valor === '') return '';
     
+    // Limpiar el valor
     $valor_limpio = str_replace(',', '.', trim($valor));
     $float_valor = floatval($valor_limpio);
     $porcentaje = $float_valor * 100;
     
-    if ($porcentaje == intval($porcentaje)) {
-        return intval($porcentaje) . '%';
+    // Redondear para evitar problemas de precisión
+    $porcentaje_redondeado = round($porcentaje, 2);
+    
+    // Verificar si es un entero (con tolerancia)
+    if (abs($porcentaje_redondeado - intval($porcentaje_redondeado)) < 0.0001) {
+        return intval($porcentaje_redondeado) . '%';
     } else {
-        return number_format($porcentaje, 2, ',', '') . '%';
+        // Mostrar máximo 2 decimales, pero eliminar .00 si existe
+        $formateado = number_format($porcentaje_redondeado, 2, ',', '');
+        $formateado = rtrim($formateado, '0');
+        $formateado = rtrim($formateado, ',');
+        return $formateado . '%';
     }
 }
 
@@ -249,29 +258,29 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
         
         // Determinar valores según modo
         if ($modo_especial === '0') {
-            $descarga_pall = trim($_POST['descarga_pall'] ?? '0,00');
-            $estibaje_cajas = trim($_POST['estibaje_cajas'] ?? '0,00');
-            $pall_in = trim($_POST['pall_in'] ?? '0,00');
-            $operacion_cajas_recepcion = trim($_POST['operacion_cajas_recepcion'] ?? '0,00');
-            $operacion_und_recepcion = trim($_POST['operacion_und_recepcion'] ?? '0,00');
-            $m2_almacen = trim($_POST['m2_almacen'] ?? '0,00');
-            $almacen_pos = trim($_POST['almacen_pos'] ?? '0,00');
-            $pall_out = trim($_POST['pall_out'] ?? '0,00');
-            $operacion_cajas_despacho = trim($_POST['operacion_cajas_despacho'] ?? '0,00');
-            $operacion_und_despacho = trim($_POST['operacion_und_despacho'] ?? '0,00');
-            $carga_pall = trim($_POST['carga_pall'] ?? '0,00');
+            $descarga_pall = trim($_POST['descarga_pall'] ?? '0,000');
+            $estibaje_cajas = trim($_POST['estibaje_cajas'] ?? '0,000');
+            $pall_in = trim($_POST['pall_in'] ?? '0,000');
+            $operacion_cajas_recepcion = trim($_POST['operacion_cajas_recepcion'] ?? '0,000');
+            $operacion_und_recepcion = trim($_POST['operacion_und_recepcion'] ?? '0,000');
+            $m2_almacen = trim($_POST['m2_almacen'] ?? '0,000');
+            $almacen_pos = trim($_POST['almacen_pos'] ?? '0,000');
+            $pall_out = trim($_POST['pall_out'] ?? '0,000');
+            $operacion_cajas_despacho = trim($_POST['operacion_cajas_despacho'] ?? '0,000');
+            $operacion_und_despacho = trim($_POST['operacion_und_despacho'] ?? '0,000');
+            $carga_pall = trim($_POST['carga_pall'] ?? '0,000');
         } else {
-            $descarga_pall = '0,00';
-            $estibaje_cajas = '0,00';
-            $pall_in = '0,00';
-            $operacion_cajas_recepcion = '0,00';
-            $operacion_und_recepcion = '0,00';
-            $m2_almacen = '0,00';
-            $almacen_pos = '0,00';
-            $pall_out = '0,00';
-            $operacion_cajas_despacho = '0,00';
-            $operacion_und_despacho = '0,00';
-            $carga_pall = '0,00';
+            $descarga_pall = '0,000';
+            $estibaje_cajas = '0,000';
+            $pall_in = '0,000';
+            $operacion_cajas_recepcion = '0,000';
+            $operacion_und_recepcion = '0,000';
+            $m2_almacen = '0,000';
+            $almacen_pos = '0,000';
+            $pall_out = '0,000';
+            $operacion_cajas_despacho = '0,000';
+            $operacion_und_despacho = '0,000';
+            $carga_pall = '0,000';
         }
         
         // ACTUALIZAR REGISTRO PRINCIPAL (ajustar según tu estructura real)
@@ -353,7 +362,7 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
             if (is_array($tarifas_especiales)) {
                 foreach ($tarifas_especiales as $tarifa) {
                     $servicio_tarifa = trim($tarifa['servicio'] ?? '');
-                    $costo = trim($tarifa['costo'] ?? '0,00');
+                    $costo = trim($tarifa['costo'] ?? '0,000');
                     $frecuencia = trim($tarifa['frecuencia'] ?? 'Mensualizado');
                     
                     if (!empty($servicio_tarifa)) {
@@ -1245,8 +1254,8 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                                 <span class="input-group-text">$</span>
                               </div>
                               <input type="text" name="descarga_pall" class="form-control tarifa-normal" 
-                                     placeholder="0,00" 
-                                     value="<?= htmlspecialchars($registro[' descarga_pall'] ?? '0,00') ?>">
+                                     placeholder="0,000" 
+                                     value="<?= htmlspecialchars($registro[' descarga_pall'] ?? '0,000') ?>">
                             </div>
                           </div>
                           
@@ -1257,8 +1266,8 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                                 <span class="input-group-text">$</span>
                               </div>
                               <input type="text" name="estibaje_cajas" class="form-control tarifa-normal" 
-                                     placeholder="0,00" 
-                                     value="<?= htmlspecialchars($registro[' estibaje_cajas'] ?? '0,00') ?>">
+                                     placeholder="0,000" 
+                                     value="<?= htmlspecialchars($registro[' estibaje_cajas'] ?? '0,000') ?>">
                             </div>
                           </div>
                           
@@ -1269,8 +1278,8 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                                 <span class="input-group-text">$</span>
                               </div>
                               <input type="text" name="pall_in" class="form-control tarifa-normal" 
-                                     placeholder="0,00" 
-                                     value="<?= htmlspecialchars($registro[' pall_in'] ?? '0,00') ?>">
+                                     placeholder="0,000" 
+                                     value="<?= htmlspecialchars($registro[' pall_in'] ?? '0,000') ?>">
                             </div>
                           </div>
                           
@@ -1281,8 +1290,8 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                                 <span class="input-group-text">$</span>
                               </div>
                               <input type="text" name="operacion_cajas_recepcion" class="form-control tarifa-normal" 
-                                     placeholder="0,00" 
-                                     value="<?= htmlspecialchars($registro[' operacion_cajas_recepcion'] ?? '0,00') ?>">
+                                     placeholder="0,000" 
+                                     value="<?= htmlspecialchars($registro[' operacion_cajas_recepcion'] ?? '0,000') ?>">
                             </div>
                           </div>
                           
@@ -1293,8 +1302,8 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                                 <span class="input-group-text">$</span>
                               </div>
                               <input type="text" name="operacion_und_recepcion" class="form-control tarifa-normal" 
-                                     placeholder="0,00" 
-                                     value="<?= htmlspecialchars($registro[' operacion_und_recepcion'] ?? '0,00') ?>">
+                                     placeholder="0,000" 
+                                     value="<?= htmlspecialchars($registro[' operacion_und_recepcion'] ?? '0,000') ?>">
                             </div>
                           </div>
                         </div>
@@ -1309,8 +1318,8 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                                 <span class="input-group-text">$</span>
                               </div>
                               <input type="text" name="m2_almacen" class="form-control tarifa-normal" 
-                                     placeholder="0,00" 
-                                     value="<?= htmlspecialchars($registro[' m2_almacen'] ?? '0,00') ?>">
+                                     placeholder="0,000" 
+                                     value="<?= htmlspecialchars($registro[' m2_almacen'] ?? '0,000') ?>">
                             </div>
                           </div>
                           
@@ -1321,8 +1330,8 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                                 <span class="input-group-text">$</span>
                               </div>
                               <input type="text" name="almacen_pos" class="form-control tarifa-normal" 
-                                     placeholder="0,00" 
-                                     value="<?= htmlspecialchars($registro[' almacen_pos'] ?? '0,00') ?>">
+                                     placeholder="0,000" 
+                                     value="<?= htmlspecialchars($registro[' almacen_pos'] ?? '0,000') ?>">
                             </div>
                           </div>
                         </div>
@@ -1339,8 +1348,8 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                                 <span class="input-group-text">$</span>
                               </div>
                               <input type="text" name="pall_out" class="form-control tarifa-normal" 
-                                     placeholder="0,00" 
-                                     value="<?= htmlspecialchars($registro[' pall_out'] ?? '0,00') ?>">
+                                     placeholder="0,000" 
+                                     value="<?= htmlspecialchars($registro[' pall_out'] ?? '0,000') ?>">
                             </div>
                           </div>
                           
@@ -1351,8 +1360,8 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                                 <span class="input-group-text">$</span>
                               </div>
                               <input type="text" name="operacion_cajas_despacho" class="form-control tarifa-normal" 
-                                     placeholder="0,00" 
-                                     value="<?= htmlspecialchars($registro[' operacion_cajas_despacho'] ?? '0,00') ?>">
+                                     placeholder="0,000" 
+                                     value="<?= htmlspecialchars($registro[' operacion_cajas_despacho'] ?? '0,000') ?>">
                             </div>
                           </div>
                           
@@ -1363,8 +1372,8 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                                 <span class="input-group-text">$</span>
                               </div>
                               <input type="text" name="operacion_und_despacho" class="form-control tarifa-normal" 
-                                     placeholder="0,00" 
-                                     value="<?= htmlspecialchars($registro[' operacion_und_despacho'] ?? '0,00') ?>">
+                                     placeholder="0,000" 
+                                     value="<?= htmlspecialchars($registro[' operacion_und_despacho'] ?? '0,000') ?>">
                             </div>
                           </div>
                           
@@ -1375,8 +1384,8 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                                 <span class="input-group-text">$</span>
                               </div>
                               <input type="text" name="carga_pall" class="form-control tarifa-normal" 
-                                     placeholder="0,00" 
-                                     value="<?= htmlspecialchars($registro[' carga_pall'] ?? '0,00') ?>">
+                                     placeholder="0,000" 
+                                     value="<?= htmlspecialchars($registro[' carga_pall'] ?? '0,000') ?>">
                             </div>
                           </div>
                         </div>
@@ -1431,8 +1440,8 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                                     <span class="input-group-text">$</span>
                                   </div>
                                   <input type="text" class="form-control costo-especial" 
-                                         placeholder="0,00" 
-                                         value="<?= htmlspecialchars($tarifa['costo'] ?? '0,00') ?>"
+                                         placeholder="0,000" 
+                                         value="<?= htmlspecialchars($tarifa['costo'] ?? '0,000') ?>"
                                          data-index="<?= $index + 1 ?>">
                                 </div>
                               </div>
@@ -1621,7 +1630,7 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                   <span class="input-group-text">$</span>
                 </div>
                 <input type="text" class="form-control costo-especial" 
-                       placeholder="0,00" value="0,00" 
+                       placeholder="0,000" value="0,000" 
                        data-index="${contadorTarifasEspeciales}">
               </div>
             </div>
@@ -1710,7 +1719,7 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
       let value = $(this).val().trim();
       if (value && /^\d+(\.\d+)?$/.test(value.replace(',', '.'))) {
         let num = parseFloat(value.replace(',', '.'));
-        $(this).val(num.toFixed(2).replace('.', ','));
+        $(this).val(num.toFixed(3).replace('.', ','));
       }
     });
     
@@ -1777,7 +1786,7 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
             alert('Todos los servicios especiales deben tener un nombre');
             return;
           }
-          if (!tarifa.costo || tarifa.costo === '0,00') {
+          if (!tarifa.costo || tarifa.costo === '0,000') {
             alert('Todos los servicios especiales deben tener un costo');
             return;
           }

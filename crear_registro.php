@@ -97,30 +97,30 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
         
         // Si NO es modo especial, obtener las tarifas normales
         if ($modo_especial === '0') {
-            $descarga_pall = trim($_POST['descarga_pall'] ?? '0,00');
-            $estibaje_cajas = trim($_POST['estibaje_cajas'] ?? '0,00');
-            $pall_in = trim($_POST['pall_in'] ?? '0,00');
-            $operacion_cajas_recepcion = trim($_POST['operacion_cajas_recepcion'] ?? '0,00');
-            $operacion_und_recepcion = trim($_POST['operacion_und_recepcion'] ?? '0,00');
-            $m2_almacen = trim($_POST['m2_almacen'] ?? '0,00');
-            $almacen_pos = trim($_POST['almacen_pos'] ?? '0,00');
-            $pall_out = trim($_POST['pall_out'] ?? '0,00');
-            $operacion_cajas_despacho = trim($_POST['operacion_cajas_despacho'] ?? '0,00');
-            $operacion_und_despacho = trim($_POST['operacion_und_despacho'] ?? '0,00');
-            $carga_pall = trim($_POST['carga_pall'] ?? '0,00');
+            $descarga_pall = trim($_POST['descarga_pall'] ?? '0,000');
+            $estibaje_cajas = trim($_POST['estibaje_cajas'] ?? '0,000');
+            $pall_in = trim($_POST['pall_in'] ?? '0,000');
+            $operacion_cajas_recepcion = trim($_POST['operacion_cajas_recepcion'] ?? '0,000');
+            $operacion_und_recepcion = trim($_POST['operacion_und_recepcion'] ?? '0,000');
+            $m2_almacen = trim($_POST['m2_almacen'] ?? '0,000');
+            $almacen_pos = trim($_POST['almacen_pos'] ?? '0,000');
+            $pall_out = trim($_POST['pall_out'] ?? '0,000');
+            $operacion_cajas_despacho = trim($_POST['operacion_cajas_despacho'] ?? '0,000');
+            $operacion_und_despacho = trim($_POST['operacion_und_despacho'] ?? '0,000');
+            $carga_pall = trim($_POST['carga_pall'] ?? '0,000');
         } else {
             // Si es modo especial, todos los campos de tarifa van vacíos
-            $descarga_pall = '0,00';
-            $estibaje_cajas = '0,00';
-            $pall_in = '0,00';
-            $operacion_cajas_recepcion = '0,00';
-            $operacion_und_recepcion = '0,00';
-            $m2_almacen = '0,00';
-            $almacen_pos = '0,00';
-            $pall_out = '0,00';
-            $operacion_cajas_despacho = '0,00';
-            $operacion_und_despacho = '0,00';
-            $carga_pall = '0,00';
+            $descarga_pall = '0,000';
+            $estibaje_cajas = '0,000';
+            $pall_in = '0,000';
+            $operacion_cajas_recepcion = '0,000';
+            $operacion_und_recepcion = '0,000';
+            $m2_almacen = '0,000';
+            $almacen_pos = '0,000';
+            $pall_out = '0,000';
+            $operacion_cajas_despacho = '0,000';
+            $operacion_und_despacho = '0,000';
+            $carga_pall = '0,000';
         }
         
         // CONSULTA CORREGIDA según tu estructura de BD CON GUID
@@ -199,7 +199,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
             if (is_array($tarifas_especiales)) {
                 foreach ($tarifas_especiales as $tarifa) {
                     $servicio_tarifa = trim($tarifa['servicio'] ?? '');
-                    $costo = trim($tarifa['costo'] ?? '0,00');
+                    $costo = trim($tarifa['costo'] ?? '0,000');
                     $frecuencia = trim($tarifa['frecuencia'] ?? 'Mensualizado');
                     
                     if (!empty($servicio_tarifa)) {
@@ -712,7 +712,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="descarga_pall" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="descarga_pall" class="form-control tarifa-normal" placeholder="0,000" value="0,000">
                             </div>
                           </div>
                           
@@ -722,7 +722,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="estibaje_cajas" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="estibaje_cajas" class="form-control tarifa-normal" placeholder="0,000" value="0,000">
                             </div>
                           </div>
                           
@@ -732,7 +732,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="pall_in" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="pall_in" class="form-control tarifa-normal" placeholder="0,000" value="0,000">
                             </div>
                           </div>
                           
@@ -742,7 +742,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="operacion_cajas_recepcion" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="operacion_cajas_recepcion" class="form-control tarifa-normal" placeholder="0,000" value="0,000">
                             </div>
                           </div>
                           
@@ -752,7 +752,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="operacion_und_recepcion" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="operacion_und_recepcion" class="form-control tarifa-normal" placeholder="0,000" value="0,000">
                             </div>
                           </div>
                         </div>
@@ -766,7 +766,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="m2_almacen" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="m2_almacen" class="form-control tarifa-normal" placeholder="0,000" value="0,000">
                             </div>
                           </div>
                           
@@ -776,7 +776,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="almacen_pos" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="almacen_pos" class="form-control tarifa-normal" placeholder="0,000" value="0,000">
                             </div>
                           </div>
                         </div>
@@ -792,7 +792,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="pall_out" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="pall_out" class="form-control tarifa-normal" placeholder="0,000" value="0,000">
                             </div>
                           </div>
                           
@@ -802,7 +802,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="operacion_cajas_despacho" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="operacion_cajas_despacho" class="form-control tarifa-normal" placeholder="0,000" value="0,000">
                             </div>
                           </div>
                           
@@ -812,7 +812,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="operacion_und_despacho" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="operacion_und_despacho" class="form-control tarifa-normal" placeholder="0,000" value="0,000">
                             </div>
                           </div>
                           
@@ -822,7 +822,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                               <div class="input-group-prepend">
                                 <span class="input-group-text">$</span>
                               </div>
-                              <input type="text" name="carga_pall" class="form-control tarifa-normal" placeholder="0,00" value="0,00">
+                              <input type="text" name="carga_pall" class="form-control tarifa-normal" placeholder="0,000" value="0,000">
                             </div>
                           </div>
                         </div>
@@ -965,7 +965,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                   <span class="input-group-text">$</span>
                 </div>
                 <input type="text" class="form-control costo-especial" 
-                       placeholder="0,00" value="0,00" 
+                       placeholder="0,000" value="0,000" 
                        data-index="${contadorTarifasEspeciales}">
               </div>
             </div>
@@ -1057,7 +1057,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
       let value = $(this).val().trim();
       if (value && /^\d+(\.\d+)?$/.test(value.replace(',', '.'))) {
         let num = parseFloat(value.replace(',', '.'));
-        $(this).val(num.toFixed(2).replace('.', ','));
+        $(this).val(num.toFixed(3).replace('.', ','));
       }
     });
     
@@ -1125,7 +1125,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
             alert('Todos los servicios especiales deben tener un nombre');
             return;
           }
-          if (!tarifa.costo || tarifa.costo === '0,00') {
+          if (!tarifa.costo || tarifa.costo === '0,000') {
             alert('Todos los servicios especiales deben tener un costo');
             return;
           }

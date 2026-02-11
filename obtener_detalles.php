@@ -130,7 +130,7 @@ function generarTablaTarifasNormales($registro) {
             'alcance' => 'Operador + Montacarga',
             'udm' => 'Pallet',
             'frecuencia' => 'Por evento',
-            'valor' => isset($registro[' descarga_pall']) ? $registro[' descarga_pall'] : '0,00'
+            'valor' => isset($registro[' descarga_pall']) ? $registro[' descarga_pall'] : '0,000'
         ],
         [
             'nro' => 2,
@@ -139,7 +139,7 @@ function generarTablaTarifasNormales($registro) {
             'alcance' => 'Manual x caja / bulto',
             'udm' => 'Caja/Bulto',
             'frecuencia' => 'Por evento',
-            'valor' => isset($registro[' estibaje_cajas']) ? $registro[' estibaje_cajas'] : '0,00'
+            'valor' => isset($registro[' estibaje_cajas']) ? $registro[' estibaje_cajas'] : '0,000'
         ],
         [
             'nro' => 3,
@@ -148,7 +148,7 @@ function generarTablaTarifasNormales($registro) {
             'alcance' => 'Verificación, Reporte, Putaway',
             'udm' => 'Pallet',
             'frecuencia' => 'Por evento',
-            'valor' => isset($registro[' pall_in']) ? $registro[' pall_in'] : '0,00'
+            'valor' => isset($registro[' pall_in']) ? $registro[' pall_in'] : '0,000'
         ],
         [
             'nro' => 4,
@@ -157,7 +157,7 @@ function generarTablaTarifasNormales($registro) {
             'alcance' => 'Verificación, Reporte, Putaway',
             'udm' => 'Caja/Bulto',
             'frecuencia' => 'Por evento',
-            'valor' => isset($registro[' operacion_cajas_recepcion']) ? $registro[' operacion_cajas_recepcion'] : '0,00'
+            'valor' => isset($registro[' operacion_cajas_recepcion']) ? $registro[' operacion_cajas_recepcion'] : '0,000'
         ],
         [
             'nro' => 5,
@@ -166,7 +166,7 @@ function generarTablaTarifasNormales($registro) {
             'alcance' => 'Verificación, Reporte, Putaway',
             'udm' => 'Unidad',
             'frecuencia' => 'Por evento',
-            'valor' => isset($registro[' operacion_und_recepcion']) ? $registro[' operacion_und_recepcion'] : '0,00'
+            'valor' => isset($registro[' operacion_und_recepcion']) ? $registro[' operacion_und_recepcion'] : '0,000'
         ],
         [
             'nro' => 6,
@@ -175,7 +175,7 @@ function generarTablaTarifasNormales($registro) {
             'alcance' => 'Almacenamiento mensual por m2 de ocupación (Incluye Productos + Pasillo)',
             'udm' => 'm2',
             'frecuencia' => 'Mensual',
-            'valor' => isset($registro[' m2_almacen']) ? $registro[' m2_almacen'] : '0,00'
+            'valor' => isset($registro[' m2_almacen']) ? $registro[' m2_almacen'] : '0,000'
         ],
         [
             'nro' => 7,
@@ -184,7 +184,7 @@ function generarTablaTarifasNormales($registro) {
             'alcance' => 'Almacenamiento mensual por pallet posicion/rack para pallet mercosur (1m x 1,2m x 1,55m)',
             'udm' => 'Pallet',
             'frecuencia' => 'Por Evento',
-            'valor' => isset($registro[' almacen_pos']) ? $registro[' almacen_pos'] : '0,00'
+            'valor' => isset($registro[' almacen_pos']) ? $registro[' almacen_pos'] : '0,000'
         ],
         [
             'nro' => 8,
@@ -193,7 +193,7 @@ function generarTablaTarifasNormales($registro) {
             'alcance' => 'Picking a nivel pallet puesto en dock de carga',
             'udm' => 'Pallet',
             'frecuencia' => 'Por evento',
-            'valor' => isset($registro[' pall_out']) ? $registro[' pall_out'] : '0,00'
+            'valor' => isset($registro[' pall_out']) ? $registro[' pall_out'] : '0,000'
         ],
         [
             'nro' => 9,
@@ -202,7 +202,7 @@ function generarTablaTarifasNormales($registro) {
             'alcance' => 'Picking a nivel Caja/Bulto puesto en dock de carga',
             'udm' => 'Caja/Bulto',
             'frecuencia' => 'Por evento',
-            'valor' => isset($registro[' operacion_cajas_despacho']) ? $registro[' operacion_cajas_despacho'] : '0,00'
+            'valor' => isset($registro[' operacion_cajas_despacho']) ? $registro[' operacion_cajas_despacho'] : '0,000'
         ],
         [
             'nro' => 10,
@@ -211,7 +211,7 @@ function generarTablaTarifasNormales($registro) {
             'alcance' => 'Picking a nivel Unidades puesto en dock de carga',
             'udm' => 'Unidad',
             'frecuencia' => 'Por evento',
-            'valor' => isset($registro[' operacion_und_despacho']) ? $registro[' operacion_und_despacho'] : '0,00'
+            'valor' => isset($registro[' operacion_und_despacho']) ? $registro[' operacion_und_despacho'] : '0,000'
         ],
         [
             'nro' => 11,
@@ -220,7 +220,7 @@ function generarTablaTarifasNormales($registro) {
             'alcance' => 'Operador Montacarga',
             'udm' => 'Pallet',
             'frecuencia' => 'Por evento',
-            'valor' => isset($registro[' carga_pall']) ? $registro[' carga_pall'] : '0,00'
+            'valor' => isset($registro[' carga_pall']) ? $registro[' carga_pall'] : '0,000'
         ],
         [
             'nro' => 12,
@@ -229,7 +229,7 @@ function generarTablaTarifasNormales($registro) {
             'alcance' => 'Manual x caja / bulto',
             'udm' => 'Caja/Bulto',
             'frecuencia' => 'Por evento',
-            'valor' => isset($registro[' estibaje_cajas']) ? $registro[' estibaje_cajas'] : '0,00'
+            'valor' => isset($registro[' estibaje_cajas']) ? $registro[' estibaje_cajas'] : '0,000'
         ],
         [
             'nro' => 13,
@@ -238,7 +238,7 @@ function generarTablaTarifasNormales($registro) {
             'alcance' => 'Facturación mínima para el servicio logístico',
             'udm' => 'Global',
             'frecuencia' => 'Mensual',
-            'valor' => '400,00'
+            'valor' => '400,000'
         ]
     ];
     
@@ -445,7 +445,7 @@ function generarTablaTarifasEspeciales($registro, $tarifas_especiales, $guid = '
             $costo_numero = floatval($costo_limpio);
             $total_costo += $costo_numero;
             
-            $costo_formateado = number_format($costo_numero, 2, ',', '.');
+            $costo_formateado = number_format($costo_numero, 3, ',', '.');
             
             $html .= '
                 <tr>
@@ -468,7 +468,7 @@ function generarTablaTarifasEspeciales($registro, $tarifas_especiales, $guid = '
             $contador++;
         }
         
-        $total_formateado = number_format($total_costo, 2, ',', '.');
+        $total_formateado = number_format($total_costo, 3, ',', '.');
         
         $html .= '
                 </tbody>
