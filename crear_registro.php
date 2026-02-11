@@ -975,6 +975,7 @@ if (isset($_POST['confirmar_guardado']) && $_POST['confirmar_guardado'] === 'tru
                 <option value="Mensualizado">Mensualizado</option>
                 <option value="Anual">Anual</option>
                 <option value="Dia">Día</option>
+                <option value="Unitaria">Unitaria</option>
               </select>
             </div>
           </div>

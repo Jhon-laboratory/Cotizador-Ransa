@@ -1451,6 +1451,7 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                                   <option value="Mensualizado" <?= isset($tarifa['Frecuencia']) && $tarifa['Frecuencia'] == 'Mensualizado' ? 'selected' : '' ?>>Mensualizado</option>
                                   <option value="Anual" <?= isset($tarifa['Frecuencia']) && $tarifa['Frecuencia'] == 'Anual' ? 'selected' : '' ?>>Anual</option>
                                   <option value="Dia" <?= isset($tarifa['Frecuencia']) && $tarifa['Frecuencia'] == 'Dia' ? 'selected' : '' ?>>Día</option>
+                                  <option value="Unitaria" <?= isset($tarifa['Frecuencia']) && $tarifa['Frecuencia'] == 'Unitaria' ? 'selected' : '' ?>>Unitaria</option>
                                 </select>
                               </div>
                             </div>
@@ -1640,6 +1641,7 @@ if (isset($_POST['confirmar_modificacion']) && $_POST['confirmar_modificacion'] 
                 <option value="Mensualizado">Mensualizado</option>
                 <option value="Anual">Anual</option>
                 <option value="Dia">Día</option>
+                <option value="Unitaria">Unitaria</option>
               </select>
             </div>
           </div>

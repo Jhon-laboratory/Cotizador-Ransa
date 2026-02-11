@@ -1083,7 +1083,7 @@ function generarVistaTarifasEspeciales($registro, $tarifas_especiales, $cliente_
                             case 'Dia':
                                 $color_frecuencia = '#e74c3c';
                                 break;
-                            case 'Unitario':
+                            case 'Unitaria':
                                 $color_frecuencia = '#f39c12';
                                 break;
                             default:

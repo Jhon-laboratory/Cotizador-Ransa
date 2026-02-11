@@ -456,12 +456,20 @@ function generarTablaTarifasEspeciales($registro, $tarifas_especiales, $guid = '
                         <span class="badge" style="background-color: ';
             
             // Color diferente según frecuencia
+            // Color diferente según frecuencia
             $frecuencia = $tarifa['Frecuencia'] ?? 'Mensualizado';
             if ($frecuencia == 'Anual') $html .= '#28a745';
             elseif ($frecuencia == 'Mensualizado') $html .= '#007bff';
+            elseif ($frecuencia == 'Unitaria') $html .= '#9b59b6'; // Color morado para Unitaria
             else $html .= '#6c757d';
             
-            $html .= '; color: white;">' . htmlspecialchars($frecuencia) . '</span>
+            $html .= '; color: white;">';
+            if ($frecuencia == 'Unitaria') {
+                $html .= '<i class="fa fa-cube"></i> ' . htmlspecialchars($frecuencia);
+            } else {
+                $html .= htmlspecialchars($frecuencia);
+            }
+            $html .= '</span>
                     </td>
                 </tr>';
             
